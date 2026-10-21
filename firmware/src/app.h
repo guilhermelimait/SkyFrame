@@ -3,7 +3,9 @@
 #include <atomic>
 #include "astro.h"
 
-#define FW_VERSION "1.1"
+#ifndef FW_VERSION          // the update-test build overrides it (see platformio.ini)
+#define FW_VERSION "1.2"
+#endif
 #define HOSTNAME "skyframe"
 #define SETUP_AP "SkyFrame-Setup"
 // Where updates come from (GitHub "owner/repo") and the links shown in the settings page.
@@ -79,6 +81,7 @@ extern char ipStr[16];
 extern char pairPin[8];          // 6-digit code needed by the settings page (shown when you hold the screen)
 extern char apPass[12];          // password of the first-time setup hotspot (shown on screen)
 extern volatile bool otaForce;   // "Check for updates now" from the settings page
+extern volatile bool radioOff;   // USB debug: keep Wi-Fi off (to check its effect on the screen)
 extern volatile bool otaPeek;    // settings page opened: look for a new version without installing
 void secLoad();
 void secNewPin();

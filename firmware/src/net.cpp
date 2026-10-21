@@ -142,6 +142,7 @@ char pairPin[8] = "";
 char apPass[12] = "";
 volatile bool otaForce = false;
 volatile bool otaPeek = false;
+volatile bool radioOff = false;
 void secNewPin() {
   snprintf(pairPin, sizeof pairPin, "%06lu", (unsigned long)(esp_random() % 1000000));
   hwFlashBegin();
@@ -355,6 +356,7 @@ static void netTask(void *) {
     Config c;
     LOCK(); c = CFG; UNLOCK();
 
+    if (radioOff) { if (wifiOk || WiFi.getMode() != WIFI_OFF) { disconnectWifi(); wifiOk = false; } delay(200); continue; }
     if (!setupMode) {
       bool due = !synced || dirty || otaForce || ms - lastSyncMs > SYNC_MINUTES * 60000u;
       nextSyncAt = lastSyncMs + SYNC_MINUTES * 60000u;
@@ -373,8 +375,12 @@ static void netTask(void *) {
           synced = true;
           lastSyncMs = ms;
           lastSync = nowUtc();
-          otaMarkGood();   // this firmware works: tell the bootloader to keep it
-          pendingVerify = false;
+          if (pendingVerify) {   // first good update after installing: tell the bootloader to keep this firmware
+            hwFlashBegin();
+            otaMarkGood();
+            hwFlashEnd();
+            pendingVerify = false;
+          }
         }
       } else if (due && !wifiOk) lastSyncMs = ms - (SYNC_MINUTES - 2) * 60000u;   // retry in 2 minutes
       // firmware updates: when asked from the settings page, or once a day between 3 and 5 at night

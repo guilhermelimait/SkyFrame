@@ -9,7 +9,7 @@ fetch their data over Wi-Fi a few times an hour, and update their own firmware f
 
 ![All 16 SkyFrame screens](docs/overview.png)
 
-**Current version: 1.1** · [Changelog](CHANGELOG.md) · [Security](SECURITY.md) · [Hardware notes](docs/hardware.md)
+**Current version: 1.2** · [Changelog](CHANGELOG.md) · [Security](SECURITY.md) · [Hardware notes](docs/hardware.md)
 
 > **Project status: proof of concept / MVP**
 >
@@ -120,9 +120,11 @@ SkyFrame keeps itself up to date from this repository's **[Releases](../../relea
 
 - **Every night between 3 and 5** the display checks GitHub. If there's a newer version, it downloads it,
   checks its signature, installs it, shows a progress screen and restarts.
-- **Opening the settings page** also checks GitHub (at most every 10 minutes). If a new version is out, the
-  page shows a popup (**Install now** / **Later**, with a link to what's new); afterwards *Updates* keeps an
-  **Install now** button. Opening the page never installs anything by itself.
+- **Opening the settings page** checks GitHub (at most every 10 minutes) and shows the result at the top: the
+  version and *up to date*, or a **yellow bar** when a new version is out, with **Install now** and *What's new*.
+  The bar stays, with download progress, until the display is updated. Opening the page never installs anything by itself.
+- The update downloads into memory first and is written to flash only after its signature checks out; the
+  screen goes dark for a few seconds while it's written, then the display restarts.
 - **Automatic install is on by default.** Turn it off in *Settings → Updates → Install new versions automatically*.
 - **Check for updates now** in the same section checks right away; **View on GitHub** opens this page.
 - Only versions **signed with the project's key** are installed, over certificate-checked HTTPS. If a new version
@@ -212,10 +214,24 @@ python tools/shot.py out t=now demo s=0 shot s=1 shot
 | `demo` | load sample weather, air-quality and Space Station data |
 | `s <n>` | force screen *n* (`-1` releases it) |
 | `log` | toggle event logging (touches, screen changes, draw times) |
+| `update` | check GitHub now and install a newer version, with the log over USB |
+| `radio 0` / `radio 1` | force Wi-Fi off / back on (to check whether a glitch comes from network activity) |
 | `sigtest <hex signature> <message>` | check a signature with the built-in update key |
 
 The debug channel only works over a USB cable and can't read the Wi-Fi password. It can capture whatever
 the screen shows, including the pairing-code screen, the same as someone holding the board.
+
+### Testing updates
+
+To try the whole update path without publishing anything, flash the **update-test** build. It is the normal
+firmware, but it reports version 1.0.9 (use it from 1.2 on: 1.1 can't download updates):
+
+```bash
+pio run -e update-test -t upload
+```
+
+Open the settings page: the display finds the latest release on GitHub, shows the yellow **update available** bar,
+and **Install now** downloads it, checks its signature, installs it and restarts on the real release.
 
 ### Browser version
 

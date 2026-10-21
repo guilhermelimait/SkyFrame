@@ -13,6 +13,6 @@ void hwBacklight(int pct);
 // Wrap flash writes in these: the backlight goes off, and the panel restarts cleanly afterwards.
 void hwFlashBegin();
 void hwFlashEnd();
-void hwResync();        // restart the panel's scan-out at the next frame
+int hwResync();         // restart the panel's scan-out at the next frame (0 = accepted)
 bool hwTouch(int &x, int &y);   // true while a finger is down
 bool hwHasTouch();

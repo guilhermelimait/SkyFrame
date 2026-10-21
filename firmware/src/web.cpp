@@ -125,7 +125,7 @@ static void setupRoutes() {
     JsonDocument d;
     d["ssid"] = wifiSsid; d["ip"] = ipStr; d["rssi"] = WiFi.RSSI(); d["version"] = FW_VERSION;
     d["uptime"] = millis() / 1000; d["heap"] = ESP.getFreeHeap(); d["psram"] = ESP.getFreePsram();
-    d["update"] = otaStatus; d["updating"] = otaPercent; d["available"] = otaAvailable;
+    d["update"] = otaStatus; d["updating"] = otaPercent; d["available"] = otaAvailable; d["phase"] = otaPhase;
     d["projectUrl"] = PROJECT_URL; d["donateUrl"] = DONATE_URL;
     d["current"] = curScreen >= 0 && curScreen < N_SCREENS ? SCREEN_KEYS[curScreen] : "";
     d["hold"] = (bool)holdScreen;

@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.2 (2026-10-21)
+
+### Display
+- **Fix: the screen glitched constantly while the settings page was open.** Every status request (every 2 s)
+  read the settings storage in flash to report whether the Wi-Fi password is encrypted, and flash reads pause the
+  panel's picture memory. That answer is now worked out once at start-up. Found by testing with Wi-Fi forced off
+  and on, and with the page open and closed.
+- The firmware is confirmed to the bootloader only once after an update, not on every data update.
+
+### Settings page
+- The header shows the version and whether it's up to date as soon as the page opens.
+- A **yellow bar** at the top replaces the update popup: it says when a new version is out, offers **Install now**
+  and *What's new*, shows download and install progress, and stays until the display is updated.
+
+### Updates
+- **Fix: updates could not be downloaded.** GitHub sends release files through a redirect to its download
+  servers, and the HTTP library reconnected there without the certificate list, so the secure connection was
+  refused ("Couldn't download the signature"). Redirects are now followed with a fresh, certificate-checked
+  connection for each step. Tested end to end: found, downloaded, signature checked, installed, restarted.
+- **The screen no longer goes wild during an update.** The update is downloaded into memory first (the screen
+  stays calm and shows progress), its signature is checked, and only then written to flash in a few seconds with
+  the backlight off. Nothing touches flash unless the signature is valid.
+- **Displays on 1.1 need one USB flash to get 1.2**, because 1.1 itself can't download updates. From 1.2 on,
+  updates install by themselves again.
+- Update errors now show the HTTP code, and the USB debug channel can start an update (`update`) and shows its log.
+- New `update-test` build (`pio run -e update-test -t upload`): reports version 1.0.9, so you can test the
+  whole update path against the latest real release without publishing anything.
+
 ## 1.1 (2026-10-21)
 
 ### SkyFrame
@@ -42,7 +70,7 @@
 - Saving shows "Saved" next to the setting and offers Undo; a short welcome on the first visit.
 - Larger touch targets and keyboard support (arrow keys reorder screens).
 - Opening the page checks GitHub for a new version (without installing, at most every 10 minutes) and offers
-  **Install now** when one is available, with a popup the first time a new version is found.
+  **Install now** when one is available.
 - The page's font (Inter) is served by the display itself: the page loads nothing from the internet except
   city searches, and looks the same offline.
 - The About buttons (GitHub, Ko-fi, MIT license) are the same size and aligned; they stack on phones.

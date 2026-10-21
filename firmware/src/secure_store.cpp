@@ -8,6 +8,7 @@
 // Burning the eFuse is a one-time, permanent write that uses one of the chip's six key blocks. It doesn't
 // affect booting, USB flashing or updates.
 #include "secure_store.h"
+#include "hw.h"
 #include <Preferences.h>
 #include <nvs_flash.h>
 #include <esp_efuse.h>
@@ -152,10 +153,18 @@ void wifiMigrateAtBoot() {
   pass = String();
 }
 
+// Worked out once: reading settings storage goes through the flash driver, which pauses the panel's picture
+// memory, so doing it on every status request (every 2 s while the settings page is open) made the screen glitch.
+// The answer only changes with a restart (saving Wi-Fi and the encryption step both restart the board).
 const char *wifiPasswordState() {
-  if (wifiPasswordProtected()) return "encrypted";
-  if (!ssKeyReady() && esp_efuse_find_unused_key_block() == EFUSE_BLK_KEY_MAX) return "unavailable";
-  return "pending";
+  static const char *state = nullptr;
+  if (state) return state;
+  hwFlashBegin();
+  if (wifiPasswordProtected()) state = "encrypted";
+  else if (!ssKeyReady() && esp_efuse_find_unused_key_block() == EFUSE_BLK_KEY_MAX) state = "unavailable";
+  else state = "pending";
+  hwFlashEnd();
+  return state;
 }
 
 bool wifiPasswordProtected() {

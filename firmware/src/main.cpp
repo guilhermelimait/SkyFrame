@@ -53,7 +53,8 @@ const uint16_t *previewFrame() { return CFG.rotation ? upright : hwFront(); }
    "t <unix>"    -> set the clock
    "s <id>"      -> force a screen (-1 to release)
    "demo"        -> load sample weather / air / ISS data
-   "log"         -> toggle event logging */
+   "log"         -> toggle event logging
+   "update"      -> check GitHub for a new version now and install it (progress over USB) */
 static int forced = -1;
 static bool dbg = false;
 static void loadDemo() {
@@ -105,6 +106,15 @@ static void serialDebug() {
       if (sp) *sp = 0;
       bool ok = sp && otaSelfTest(sp + 1, line + 8);
       Serial.printf("SIGTEST %s\n", ok ? "PASS" : "FAIL");
+    } else if (!strncmp(line, "radio ", 6)) {
+      radioOff = line[6] == '0';
+      Serial.printf("OK radio %s\n", radioOff ? "off" : "on");
+    } else if (!strcmp(line, "resync")) {
+      Serial.printf("RESYNC %d\n", hwResync());
+    } else if (!strcmp(line, "update")) {
+      wifiWake(10 * 60000);
+      otaForce = true;
+      Serial.print("OK update\n");
     } else if (!strcmp(line, "log")) {
       dbg = !dbg;
       Serial.printf("OK log %d\n", dbg);
@@ -150,7 +160,7 @@ static uint32_t redrawKey(int s) {
   mix(s); mix((uint32_t)(now / unit)); mix(dataVersion);
   mix(timeOk | (wifiOk << 1) | (setupMode << 2) | (setupFailed << 3));
   mix(s == S_CONNECTING ? millis() / 500 : 0);
-  mix(s == S_UPDATE ? otaPercent : 0);
+  mix(s == S_UPDATE ? otaPercent + otaPhase * 1000 : 0);
   return h;
 }
 

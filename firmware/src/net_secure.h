@@ -12,6 +12,7 @@ inline void secureClient(NetworkClientSecure &c) {
 
 // OTA (ota.cpp)
 extern volatile int otaPercent;      // -1 when idle, 0-100 while installing
+extern volatile int otaPhase;        // 1 downloading, 2 installing (screen dark), 3 restarting
 extern char otaStatus[72];
 extern char otaNewVersion[16];
 bool otaCheckAndInstall(const char *repo, bool install = true);   // install=false only looks for a newer version

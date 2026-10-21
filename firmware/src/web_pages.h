@@ -22,6 +22,13 @@ h1{font-size:22px;font-weight:600;margin:0;letter-spacing:-.01em}
 h2{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);font-weight:600;margin:22px 4px 8px}
 h2:first-child{margin-top:4px}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip.ok .dot{background:var(--good)}.chip.new{background:var(--sun);color:#000;font-weight:600}.chip.new .dot{background:#000}
+.updbar{position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;background:var(--sun);color:#000;border-radius:12px;padding:10px 12px 10px 16px;margin-bottom:14px;box-shadow:0 6px 24px rgba(0,0,0,.5)}
+.updbar p{margin:0;flex:1 1 220px;font-size:14.5px;line-height:1.35}.updbar p b{font-weight:700}
+.updbar .acts{display:flex;gap:8px;flex-wrap:wrap}
+.updbar a,.updbar button{min-height:38px;padding:0 14px;border-radius:9px;font-weight:600;font-size:14px;display:inline-flex;align-items:center;text-decoration:none;border:1px solid rgba(0,0,0,.35);background:transparent;color:#000}
+.updbar button{background:#000;color:var(--sun);border-color:#000}
+.updbar .bar{flex-basis:100%;height:5px;border-radius:3px;background:rgba(0,0,0,.18);overflow:hidden}.updbar .bar i{display:block;height:100%;background:#000;width:0;transition:width .4s}
 .chip{background:var(--panel2);border-radius:999px;padding:5px 11px;font-size:12.5px;color:var(--soft);display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--bad);flex:none}.dot.on{background:var(--good)}
 .grid{display:grid;gap:20px}
@@ -121,9 +128,14 @@ details[open] summary .v svg{transform:rotate(90deg)}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 </style></head><body>
 <div class="app">
+ <div class="updbar" id="updbar" role="status" aria-live="polite" hidden>
+  <p id="updbarText"></p>
+  <div class="acts" id="updbarActs"><a id="updbarNotes" href="#" target="_blank" rel="noopener">What's new</a><button id="updbarGo">Install now</button></div>
+  <div class="bar" id="updbarBar" hidden><i id="updbarFill"></i></div>
+ </div>
  <header>
   <h1>SkyFrame</h1>
-  <div class="chips" aria-live="polite"><span class="chip"><span class="dot" id="dot"></span><span id="online">Connecting…</span></span><span class="chip" id="upd1" hidden></span><span class="chip" id="upd2" hidden></span></div>
+  <div class="chips" aria-live="polite"><span class="chip"><span class="dot" id="dot"></span><span id="online">Connecting…</span></span><span class="chip" id="ver0" hidden><span class="dot"></span><span id="ver0t"></span></span><span class="chip" id="upd1" hidden></span><span class="chip" id="upd2" hidden></span></div>
  </header>
  <div class="grid">
   <section id="now" class="view on" aria-label="Now">
@@ -222,12 +234,6 @@ details[open] summary .v svg{transform:rotate(90deg)}
  <div class="btns" style="margin-top:20px;justify-content:flex-end"><button class="btn" id="wskip" style="background:none">Skip</button><button class="btn" id="wdone" style="background:var(--sun);color:#000;border-color:var(--sun)">Done</button></div>
 </div></div>
 
-<div class="modal" id="updbox" role="dialog" aria-modal="true" aria-labelledby="updTitle"><div class="card">
- <h3 id="updTitle">Update available</h3>
- <p class="note" id="updMsg" style="margin-bottom:6px"></p>
- <p class="note" style="margin-bottom:16px">Installing takes about a minute and the display restarts. If the new version doesn't start properly, it goes back to this one by itself. <a id="updNotes" href="#" target="_blank" rel="noopener" style="color:var(--soft)">What's new</a></p>
- <div class="btns eq"><button class="btn" id="updLater">Later</button><button class="btn primary" id="updNow">Install now</button></div>
-</div></div>
 <div class="modal" id="bigbox" role="dialog" aria-modal="true" aria-label="Exact picture"><div class="big"><p class="bigcap" id="bigCap">Exact picture from the display</p><canvas id="cvBig" width="480" height="480"></canvas><button class="btn" id="bigClose" style="width:100%;margin-top:12px">Close</button></div></div>
 
 <script>
@@ -721,7 +727,7 @@ async function poll(){try{st=await api("/api/status").then(r=>r.json())}catch(e)
  $("updSum").textContent=`v${st.version} · ${cfg&&cfg.update.auto?"Automatic":"Manual"}`;$("updState").textContent=(st.update?st.update:"No check yet")+(st.updating>=0?` · installing ${st.updating}%`:"");
  const av=st.available&&st.updating<0;$("check").textContent=av?`Install ${st.available} now`:"Check for updates now";$("check").classList.toggle("primary",!!av);
  $("updSum").textContent=av?`${st.available} available`:$("updSum").textContent;
- if(av)offerUpdate(st.available);
+ showVersion();
  const pw={encrypted:["Protected","ok","Wi-Fi password encrypted with a key locked inside the chip."],pending:["Pending","warn","Wi-Fi password gets encrypted after the next successful connection."],unavailable:["Not encrypted","bad","This chip has no free key slot, so the Wi-Fi password is stored unencrypted."]}[st.pwState]||["","",""];
  $("secSum").innerHTML=`<span class="${pw[1]}">${pw[0]}</span>`;$("pwInfo").textContent=pw[2];
  document.querySelectorAll(".gh").forEach(a=>a.href=st.projectUrl);$("lic").href=st.projectUrl+"/blob/main/LICENSE";$("kofi").href=st.donateUrl;$("ver").textContent="v"+st.version;
@@ -743,15 +749,20 @@ const nav=async d=>{const ord=cfg.order.filter(k=>cfg.screens.includes(k));let i
  try{if(exp)showCurrent(exp);await post("/api/nav",{dir:d});follow(exp)}catch(e){}};
 $("prev").onclick=()=>nav(-1);$("next").onclick=()=>nav(1);
 $("hold").onchange=async e=>{try{await post("/api/hold",{on:e.target.checked});toast(e.target.checked?"Holding this screen":"Screens change again")}catch(x){}};
-// popup once per new version in this browser; the Updates section keeps offering it afterwards
-function offerUpdate(tag){let seen;try{seen=localStorage.getItem("updSeen")}catch(e){}if(seen===tag||document.querySelector(".modal.open"))return;
- try{localStorage.setItem("updSeen",tag)}catch(e){}
- $("updMsg").textContent=`SkyFrame ${tag} is ready to install. This display has v${st.version}.`;
- $("updNotes").href=`${st.projectUrl}/releases/tag/${encodeURIComponent(tag)}`;
- $("updbox").classList.add("open");setTimeout(()=>$("updNow").focus(),50)}
-$("updLater").onclick=()=>{$("updbox").classList.remove("open");toast("You can install it later in Device → Updates")};
-$("updNow").onclick=async()=>{$("updbox").classList.remove("open");try{await post("/api/update/check");$("updState").textContent="Installing… the display restarts when it's done";toast("Installing the update…");setTimeout(poll,5000)}catch(e){}};
-document.addEventListener("keydown",e=>{if(e.key==="Escape"&&$("updbox").classList.contains("open"))$("updLater").click()});
+/* ---------- version status (header chip) and the yellow update bar ---------- */
+let seenVersion=null;
+function showVersion(){const v="v"+st.version,u=st.update||"",inst=st.updating>=0,av=st.available;
+ if(seenVersion&&seenVersion!==st.version){toast(`Updated to ${v}`);post("/api/update/peek").catch(()=>{})}   // just restarted on a new version
+ seenVersion=st.version;
+ const chip=$("ver0");chip.hidden=false;chip.classList.toggle("ok",!inst&&!av&&/^Up to date|^No releases/.test(u));chip.classList.toggle("new",!!(inst||av));
+ $("ver0t").textContent=inst?`Installing ${st.available||"update"}`:av?`${v} · ${av} available`:/^Checking/.test(u)?`${v} · checking for updates…`:/^Up to date|^No releases/.test(u)?`${v} · up to date`:u?`${v} · couldn't check`:v;
+ const bar=$("updbar");bar.hidden=!(inst||av);if(bar.hidden)return;
+ $("updbarNotes").href=`${st.projectUrl}/releases/tag/${encodeURIComponent(av||"")}`;
+ $("updbarActs").hidden=inst;$("updbarBar").hidden=!inst;
+ if(inst){const ph=st.phase|0;$("updbarFill").style.width=(ph>=2?100:st.updating)+"%";
+  $("updbarText").innerHTML=ph>=3?`<b>Installed ${esc(av)}.</b> The display is restarting…`:ph==2?`<b>Installing ${esc(av)}.</b> The screen turns off for a few seconds, then restarts.`:`<b>Downloading ${esc(av)}</b> · ${st.updating}%. Keep the display powered.`}
+ else $("updbarText").innerHTML=`<b>SkyFrame ${esc(av)} is available.</b> This display has ${esc(v)}.`}
+$("updbarGo").onclick=async()=>{try{await post("/api/update/check");$("updbarActs").hidden=true;$("updbarText").innerHTML=`<b>Starting the update…</b>`;setTimeout(poll,1500)}catch(e){}};
 $("check").onclick=async()=>{const inst=st&&st.available;try{await post("/api/update/check");$("updState").textContent=inst?"Installing… the display restarts when it's done":"Checking GitHub…";setTimeout(poll,5000)}catch(e){}};
 $("forget").onclick=async()=>{if(!confirm("Forget this Wi-Fi network and restart in setup mode? You'll set up Wi-Fi again from the display."))return;try{await post("/api/wifi/forget");toast("Restarting in setup mode…")}catch(e){}};
 $("newpin").onclick=async()=>{if(!confirm("Make a new pairing code? Other phones and computers will need to enter it."))return;try{const r=await post("/api/pin/new").then(r=>r.json());PIN=r.pin;try{localStorage.setItem("pin",PIN)}catch(e){}toast("New pairing code: "+r.pin)}catch(e){}};

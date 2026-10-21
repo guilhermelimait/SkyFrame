@@ -17,6 +17,7 @@
 #include "mbedtls/pk.h"
 
 volatile int otaPercent = -1;
+volatile int otaPhase = 0;
 char otaStatus[72] = "";
 char otaNewVersion[16] = "";
 char otaAvailable[16] = "";
@@ -33,7 +34,14 @@ static int verCmp(const char *a, const char *b) {   // compares "1.2.3" style ve
   return 0;
 }
 
-static void setStatus(const char *fmt, const char *arg = "") { snprintf(otaStatus, sizeof otaStatus, fmt, arg); }
+static void setStatus(const char *fmt, const char *arg = "") { snprintf(otaStatus, sizeof otaStatus, fmt, arg); Serial.printf("ota: %s\n", otaStatus); }
+
+// a download step failed: say which, with the HTTP code (or connection error), on the page and over USB
+static void failStep(const char *what, int code) {
+  snprintf(otaStatus, sizeof otaStatus, "Couldn't download the %s (error %d)", what, code);
+  Serial.printf("ota: %s: %s, internal heap %u (largest block %u)\n", otaStatus, HTTPClient::errorToString(code).c_str(),
+                (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL), (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+}
 
 static bool verifySignature(const uint8_t hash[32], const uint8_t *sig, size_t sigLen) {
   mbedtls_pk_context pk;
@@ -52,6 +60,31 @@ static bool beginGet(HTTPClient &http, NetworkClientSecure &cli, const String &u
   if (!http.begin(cli, url)) return false;
   http.addHeader("Accept", "application/vnd.github+json");
   return true;
+}
+
+// GitHub download links redirect to its file servers. The HTTP library's own redirect handling reconnects
+// without the certificate bundle (the TLS handshake then fails), so redirects are followed here instead,
+// each hop on a fresh, certificate-checked connection. Returns the final address, or "" on error.
+static String resolveDownload(String url, int &code) {
+  for (int hop = 0; hop < 5; hop++) {
+    NetworkClientSecure cli;
+    HTTPClient http;
+    secureClient(cli);
+    http.setUserAgent("skyframe/" FW_VERSION);
+    http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
+    http.setTimeout(20000);
+    const char *keep[] = {"Location"};
+    http.collectHeaders(keep, 1);
+    if (!http.begin(cli, url)) { code = -100; return ""; }
+    code = http.GET();
+    String next = http.header("Location");
+    http.end();
+    if (code == 200) return url;
+    if ((code == 301 || code == 302 || code == 303 || code == 307 || code == 308) && next.startsWith("https://")) { url = next; continue; }
+    return "";
+  }
+  code = -101;   // too many redirects
+  return "";
 }
 
 // Returns true if a new firmware was installed (the caller then reboots).
@@ -96,7 +129,10 @@ bool otaCheckAndInstall(const char *repo, bool install) {
   {
     NetworkClientSecure c2;
     HTTPClient h2;
-    if (!beginGet(h2, c2, sigUrl) || h2.GET() != 200) { h2.end(); setStatus("Couldn't download the signature"); return false; }
+    int code2;
+    sigUrl = resolveDownload(sigUrl, code2);
+    if (sigUrl.length()) code2 = beginGet(h2, c2, sigUrl) ? h2.GET() : -100;
+    if (code2 != 200) { h2.end(); failStep("signature", code2); return false; }
     String s = h2.getString();   // hex text of the DER signature
     h2.end();
     s.trim();
@@ -104,28 +140,33 @@ bool otaCheckAndInstall(const char *repo, bool install) {
     if (sigLen < 8) { setStatus("The signature file is empty or damaged"); return false; }
   }
 
-  // firmware: stream into the spare app slot while hashing it
+  // firmware: download it whole into PSRAM first. Writing flash blocks the panel's picture memory, so writing
+  // while downloading made the screen go wild for the whole download; this way the screen stays calm, nothing
+  // touches flash unless the signature is valid, and the flash write takes a few seconds with the backlight off.
   strlcpy(otaNewVersion, tag.c_str(), sizeof otaNewVersion);
   NetworkClientSecure c3;
   HTTPClient h3;
-  if (!beginGet(h3, c3, binUrl) || h3.GET() != 200) { h3.end(); setStatus("Couldn't download the firmware"); return false; }
+  int code3;
+  binUrl = resolveDownload(binUrl, code3);
+  if (binUrl.length()) code3 = beginGet(h3, c3, binUrl) ? h3.GET() : -100;
+  if (code3 != 200) { h3.end(); failStep("firmware", code3); return false; }
   int total = h3.getSize() > 0 ? h3.getSize() : binSize;
-  if (total <= 0 || !Update.begin(total)) { h3.end(); setStatus("Not enough room for the update"); return false; }
+  const esp_partition_t *slot = esp_ota_get_next_update_partition(nullptr);
+  uint8_t *img = total > 0 && slot && (uint32_t)total <= slot->size ? (uint8_t *)ps_malloc(total) : nullptr;
+  if (!img) { h3.end(); setStatus("Not enough room for the update"); return false; }
   mbedtls_sha256_context sha;
   mbedtls_sha256_init(&sha);
   mbedtls_sha256_starts(&sha, 0);
   NetworkClient *stream = h3.getStreamPtr();
-  static uint8_t buf[4096];
   int got = 0;
   uint32_t lastData = millis();
+  otaPhase = 1;
   otaPercent = 0;
   while (got < total && millis() - lastData < 20000) {
-    int n = stream->available() ? stream->readBytes(buf, min((int)sizeof buf, total - got)) : 0;
+    int n = stream->available() ? stream->readBytes(img + got, min(4096, total - got)) : 0;
     if (n <= 0) { delay(5); continue; }
     lastData = millis();
-    mbedtls_sha256_update(&sha, buf, n);
-    if (Update.write(buf, n) != (size_t)n) break;
-    if ((got ^ (got + n)) & ~0xFFFF) hwResync();   // every 64 KB
+    mbedtls_sha256_update(&sha, img + got, n);
     got += n;
     otaPercent = got * 100 / total;
   }
@@ -133,13 +174,28 @@ bool otaCheckAndInstall(const char *repo, bool install) {
   uint8_t hash[32];
   mbedtls_sha256_finish(&sha, hash);
   mbedtls_sha256_free(&sha);
-  if (got != total) { Update.abort(); otaPercent = -1; setStatus("Download interrupted, will retry later"); return false; }
+  if (got != total) { free(img); otaPercent = -1; otaPhase = 0; setStatus("Download interrupted, will retry later"); return false; }
   if (!verifySignature(hash, sig, sigLen)) {
-    Update.abort(); otaPercent = -1;
+    free(img); otaPercent = -1; otaPhase = 0;
     setStatus("Rejected %s: signature doesn't match", tag.c_str());
     return false;
   }
-  if (!Update.end(true)) { otaPercent = -1; setStatus("Couldn't finish installing"); return false; }
+
+  // install: show "installing", then write flash in one go with the backlight off
+  otaPhase = 2;
+  delay(1200);                       // let the screen show the message first
+  hwFlashBegin();
+  bool ok = Update.begin(total);
+  for (int off = 0; ok && off < total; off += 65536) {
+    int n = min(65536, total - off);
+    ok = Update.write(img + off, n) == (size_t)n;
+  }
+  ok = ok && Update.end(true);
+  if (!ok) Update.abort();
+  free(img);
+  otaPhase = ok ? 3 : 0;
+  hwFlashEnd();
+  if (!ok) { otaPercent = -1; setStatus("Couldn't finish installing"); return false; }
   setStatus("Installed %s, restarting", tag.c_str());
   return true;
 }

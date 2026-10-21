@@ -783,9 +783,9 @@ static void sUpdate() {
   if (pct > 0) gArc(240, 200, 90, 8, -HALF_PI, -HALF_PI + TWO_PI * pct / 100.f, C_SUN);
   char b[8]; snprintf(b, sizeof b, "%d%%", pct);
   gText(b, 240, 216, 44, F300, C_FG, CENTER, 0, true);
-  String t = String("Updating to ") + otaNewVersion;
+  String t = String(otaPhase >= 3 ? "Restarting on " : otaPhase == 2 ? "Installing " : "Downloading ") + otaNewVersion;
   gText(t.c_str(), 240, 352, 26, F500, C_FG, CENTER);
-  gText("Please keep the display powered", 240, 388, 17, F400, C_DIM, CENTER);
+  gText(otaPhase == 2 ? "The screen turns off for a few seconds" : "Please keep the display powered", 240, 388, 17, F400, C_DIM, CENTER);
 }
 static void sConnecting() {
   orbitMotif(240, 180);

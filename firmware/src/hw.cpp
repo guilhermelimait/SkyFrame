@@ -143,7 +143,7 @@ void hwBacklight(int pct) {
 }
 
 /* ---------- flash writes ---------- */
-void hwResync() { if (panel) esp_lcd_rgb_panel_restart(panel); }
+int hwResync() { return panel ? (int)esp_lcd_rgb_panel_restart(panel) : -1; }
 void hwFlashBegin() {
   if (flashDepth++ == 0) ledcWrite(PIN_BL, 1023);   // dark while the picture may be out of step
 }
