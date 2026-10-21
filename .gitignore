@@ -1,0 +1,24 @@
+# build output
+firmware/.pio/
+firmware/release/
+.pio/
+
+# never publish signing keys, secrets or local settings
+*.pem
+*.key
+skyframe-keys/
+keys/
+.env
+config.json
+
+# editors and operating systems
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Python
+__pycache__/
+*.pyc
