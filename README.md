@@ -244,5 +244,5 @@ The display's settings page has the same link under *About*.
 ## License
 
 MIT, see [LICENSE](LICENSE). You're free to use, copy, modify and redistribute this project, including
-commercially, as long as the copyright and license notice stay with it. It comes with no warranty and no support:
+commercially, as long as the copyright and license notice stay with it. Third-party parts (font, map data, libraries) keep their own licenses: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). It comes with no warranty and no support:
 see *Project status* at the top.
