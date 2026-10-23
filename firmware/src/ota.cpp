@@ -18,6 +18,7 @@
 
 volatile int otaPercent = -1;
 volatile int otaPhase = 0;
+volatile bool otaCancel = false;
 char otaStatus[72] = "";
 char otaNewVersion[16] = "";
 char otaAvailable[16] = "";
@@ -89,27 +90,34 @@ static String resolveDownload(String url, int &code) {
 
 // Returns true if a new firmware was installed (the caller then reboots).
 bool otaCheckAndInstall(const char *repo, bool install) {
+  otaCancel = false;   // a cancel only applies to the update it was meant for
   if (!repo || !strchr(repo, '/')) { setStatus("No GitHub repository set"); return false; }
-  NetworkClientSecure cli;
-  HTTPClient http;
+  // the latest release's description. GitHub sometimes sends it "chunked", so it's read through the HTTP library
+  // (which removes the chunk markers) rather than parsed from the raw stream; a flaky connection gets 3 tries.
   String url = String("https://api.github.com/repos/") + repo + "/releases/latest";
-  if (!beginGet(http, cli, url)) { setStatus("Couldn't reach GitHub"); return false; }
-  int code = http.GET();
-  if (code != 200) {
-    http.end();
-    if (code == 404) setStatus("No releases published yet");
-    else { char b[24]; snprintf(b, sizeof b, "%d", code); setStatus("GitHub answered with error %s", b); }
-    return false;
-  }
   JsonDocument filter;
   filter["tag_name"] = true;
   filter["assets"][0]["name"] = true;
   filter["assets"][0]["browser_download_url"] = true;
   filter["assets"][0]["size"] = true;
   JsonDocument rel;
-  DeserializationError err = deserializeJson(rel, http.getStream(), DeserializationOption::Filter(filter));
-  http.end();
-  if (err) { setStatus("Couldn't read the release info"); return false; }
+  for (int attempt = 1;; attempt++) {
+    NetworkClientSecure cli;
+    HTTPClient http;
+    if (!beginGet(http, cli, url)) { setStatus("Couldn't reach GitHub"); return false; }
+    int code = http.GET();
+    if (code == 404) { http.end(); setStatus("No releases published yet"); return false; }
+    String body = code == 200 ? http.getString() : String();
+    http.end();
+    DeserializationError err = code == 200 ? deserializeJson(rel, body, DeserializationOption::Filter(filter)) : DeserializationError::InvalidInput;
+    if (code == 200 && !err) break;
+    if (attempt >= 3) {
+      if (code != 200) { char b[24]; snprintf(b, sizeof b, "%d", code); setStatus("GitHub answered with error %s", b); }
+      else setStatus("Couldn't read the release info (%s)", err.c_str());
+      return false;
+    }
+    delay(2000);
+  }
   String tag = rel["tag_name"] | "";
   if (verCmp(tag.c_str(), FW_VERSION) <= 0) { otaAvailable[0] = 0; setStatus("Up to date (v" FW_VERSION ")"); return false; }
   strlcpy(otaAvailable, tag.c_str(), sizeof otaAvailable);
@@ -144,6 +152,7 @@ bool otaCheckAndInstall(const char *repo, bool install) {
   // while downloading made the screen go wild for the whole download; this way the screen stays calm, nothing
   // touches flash unless the signature is valid, and the flash write takes a few seconds with the backlight off.
   strlcpy(otaNewVersion, tag.c_str(), sizeof otaNewVersion);
+  if (otaCancel) { otaCancel = false; otaPercent = -1; otaPhase = 0; setStatus("Update cancelled"); return false; }
   NetworkClientSecure c3;
   HTTPClient h3;
   int code3;
@@ -162,7 +171,7 @@ bool otaCheckAndInstall(const char *repo, bool install) {
   uint32_t lastData = millis();
   otaPhase = 1;
   otaPercent = 0;
-  while (got < total && millis() - lastData < 20000) {
+  while (got < total && millis() - lastData < 20000 && !otaCancel) {
     int n = stream->available() ? stream->readBytes(img + got, min(4096, total - got)) : 0;
     if (n <= 0) { delay(5); continue; }
     lastData = millis();
@@ -174,6 +183,7 @@ bool otaCheckAndInstall(const char *repo, bool install) {
   uint8_t hash[32];
   mbedtls_sha256_finish(&sha, hash);
   mbedtls_sha256_free(&sha);
+  if (otaCancel) { otaCancel = false; free(img); otaPercent = -1; otaPhase = 0; setStatus("Update cancelled"); return false; }
   if (got != total) { free(img); otaPercent = -1; otaPhase = 0; setStatus("Download interrupted, will retry later"); return false; }
   if (!verifySignature(hash, sig, sigLen)) {
     free(img); otaPercent = -1; otaPhase = 0;

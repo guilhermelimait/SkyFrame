@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.3.2 (2026-10-23)
+
+- **Updates ask first and can be cancelled.** *Install now* opens a box covering the page ("Install v1.3.2?") with
+  **Cancel** and **Install**; while it checks and downloads, **Cancel update** stops it cleanly (the download is
+  thrown away and the display carries on). Once the new firmware is being written to flash it can't be cancelled,
+  so the button disappears for those few seconds.
+- **Fix: "Couldn't read the release info".** GitHub sometimes sends the release description in chunks, which the
+  display read as broken JSON; it's now read through the HTTP library, with 3 tries on a flaky connection.
+- The settings page is never kept by the browser (it always matches the firmware running), and it reloads itself
+  after an update so the new version's page appears.
+- **Fix: the Brightness slider seemed to do nothing at night.** It only changed the daytime level; during night
+  hours it now sets the night level (and says so), so the change shows and stays.
+- **Fix: the sound meter kept the microphone on with *Wake on sound* off.** The meter (and the microphone) now only
+  run when the option is on; the page says "Off" otherwise.
+- USB debug command `check`: look for a new version without installing.
+
 ## 1.3.1 (2026-10-23)
 
 - **Fix: opening *Screen time* in quick settings restarted the display.** The fifth page had no picture memory

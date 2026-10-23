@@ -246,8 +246,8 @@ details[open] summary .v svg{transform:rotate(90deg)}
  <div class="big" id="ulPct"></div><div class="spin" id="ulSpin" hidden></div>
  <div class="bar" id="ulBar"><i id="ulFill"></i></div>
  <p class="note" id="ulMsg"></p>
- <p class="note" style="margin-top:10px">Please keep the display powered and this page open. It goes back to the previous version by itself if anything goes wrong.</p>
- <button class="btn" id="ulClose" style="width:100%;margin-top:14px" hidden>Close</button>
+ <p class="note" id="ulNote" style="margin-top:10px">Please keep the display powered and this page open. It goes back to the previous version by itself if anything goes wrong.</p>
+ <div class="btns eq" style="margin-top:14px"><button class="btn" id="ulCancel">Cancel</button><button class="btn primary" id="ulGo">Install</button><button class="btn" id="ulClose" hidden>Close</button></div>
 </div></div>
 <div class="modal" id="bigbox" role="dialog" aria-modal="true" aria-label="Exact picture"><div class="big"><p class="bigcap" id="bigCap">Exact picture from the display</p><canvas id="cvBig" width="480" height="480"></canvas><button class="btn" id="bigClose" style="width:100%;margin-top:12px">Close</button></div></div>
 
@@ -771,7 +771,7 @@ $("hold").onchange=async e=>{try{await post("/api/hold",{on:e.target.checked});t
 /* ---------- version status (header chip) and the yellow update bar ---------- */
 let seenVersion=null;
 function showVersion(){const v="v"+st.version,u=st.update||"",inst=st.updating>=0,av=st.available;
- if(seenVersion&&seenVersion!==st.version){toast(`Updated to ${v}`);post("/api/update/peek").catch(()=>{})}   // just restarted on a new version
+ if(seenVersion&&seenVersion!==st.version){toast(`Updated to ${v}`);setTimeout(()=>location.reload(),2500);return}   // new firmware: load its page   // just restarted on a new version
  seenVersion=st.version;
  const chip=$("ver0");chip.hidden=false;chip.classList.toggle("ok",!inst&&!av&&/^Up to date|^No releases/.test(u));chip.classList.toggle("new",!!(inst||av));
  $("ver0t").textContent=inst?`Installing ${st.available||"update"}`:av?`${v} · ${av} available`:/^Checking/.test(u)?`${v} · checking for updates…`:/^Up to date|^No releases/.test(u)?`${v} · up to date`:u?`${v} · couldn't check`:v;
@@ -781,22 +781,35 @@ function showVersion(){const v="v"+st.version,u=st.update||"",inst=st.updating>=
  if(inst){const ph=st.phase|0;$("updbarFill").style.width=(ph>=2?100:st.updating)+"%";
   $("updbarText").innerHTML=ph>=3?`<b>Installed ${esc(av)}.</b> The display is restarting…`:ph==2?`<b>Installing ${esc(av)}.</b> The screen turns off for a few seconds, then restarts.`:`<b>Downloading ${esc(av)}</b> · ${st.updating}%. Keep the display powered.`}
  else $("updbarText").innerHTML=`<b>SkyFrame ${esc(av)} is available.</b> This display has ${esc(v)}.`}
-// full-screen lock while an update runs: from Install until the display is back on the new version
-let ul=null;   // {target, from, t0, lost}
-function startUpdate(){const target=st&&st.available;if(!target)return;ul={target,from:st.version,t0:Date.now(),lost:false};showLock();
- post("/api/update/check").catch(()=>{});setTimeout(poll,800)}
-function showLock(){const L=$("updlock");L.hidden=false;$("ulTitle").textContent=`Updating to ${ul.target}`;$("ulClose").hidden=true;
- const ph=st&&st.phase|0,pct=st&&st.updating>=0?st.updating:0,indet=ul.lost||ph>=2;
- $("ulPct").hidden=indet;$("ulSpin").hidden=!indet;$("ulBar").hidden=indet;$("ulPct").textContent=pct+"%";$("ulFill").style.width=pct+"%";
- $("ulMsg").textContent=ul.lost?"The display is restarting on the new version… reconnecting":ph>=3?"Installed. Restarting…":ph==2?"Installing. The display's screen turns off for a few seconds.":pct>0?"Downloading the new version":"Starting the update…"}
-function lockFail(msg){$("ulTitle").textContent="The update didn't finish";$("ulPct").hidden=true;$("ulSpin").hidden=true;$("ulBar").hidden=true;
- $("ulMsg").textContent=!msg||/^Version|^Up to date/.test(msg)?"The display didn't start the update. Please try again.":msg;$("ulClose").hidden=false;ul=null}
+// full-screen box for updates: asks first, then blocks the page with progress until the display is back on the
+// new version; it can be cancelled while it checks or downloads (not while flash is written)
+let ul=null;   // {target, from, stage:"confirm"|"run", t0, lost, cancelling}
+const ulShow=(id,on)=>{$(id).hidden=!on};
+function startUpdate(){const target=st&&st.available;if(!target)return;ul={target,from:st.version,stage:"confirm"};showLock()}
+function showLock(){const L=$("updlock");L.hidden=false;ulShow("ulClose",false);
+ if(ul.stage==="confirm"){
+  $("ulTitle").textContent=`Install ${ul.target}?`;["ulPct","ulSpin","ulBar"].forEach(x=>ulShow(x,false));
+  $("ulMsg").textContent=`This display has v${ul.from}. It downloads the new version, checks its signature, installs it and restarts, in about a minute. Your settings are kept.`;
+  ulShow("ulNote",false);ulShow("ulGo",true);ulShow("ulCancel",true);$("ulCancel").textContent="Cancel";setTimeout(()=>$("ulGo").focus(),50);return}
+ const ph=st&&st.phase|0,pct=st&&st.updating>=0?st.updating:0,indet=ul.lost||ph>=2||pct===0;
+ $("ulTitle").textContent=`Updating to ${ul.target}`;ulShow("ulNote",true);ulShow("ulGo",false);
+ ulShow("ulPct",!indet);ulShow("ulSpin",indet);ulShow("ulBar",!indet);$("ulPct").textContent=pct+"%";$("ulFill").style.width=pct+"%";
+ ulShow("ulCancel",!ul.lost&&ph<2&&!ul.cancelling);$("ulCancel").textContent="Cancel update";
+ $("ulMsg").textContent=ul.cancelling?"Cancelling…":ul.lost?"The display is restarting on the new version… reconnecting":ph>=3?"Installed. Restarting…":ph==2?"Installing. The display's screen turns off for a few seconds.":pct>0?"Downloading the new version":"Checking the new version…"}
+function closeLock(msg){$("updlock").hidden=true;ul=null;if(msg)toast(msg)}
+function lockFail(msg){$("ulTitle").textContent="The update didn't finish";["ulPct","ulSpin","ulBar","ulGo","ulCancel"].forEach(x=>ulShow(x,false));
+ $("ulMsg").textContent=!msg||/^Version|^Up to date/.test(msg)?"The display didn't start the update. Please try again.":msg;ulShow("ulClose",true);ul=null}
+$("ulGo").onclick=()=>{if(!ul)return;ul.stage="run";ul.t0=Date.now();ul.lost=false;showLock();post("/api/update/check").catch(()=>{});setTimeout(poll,800)};
+$("ulCancel").onclick=async()=>{if(!ul)return;if(ul.stage==="confirm")return closeLock();
+ ul.cancelling=true;showLock();try{await post("/api/update/cancel")}catch(e){}setTimeout(poll,600)};
 $("ulClose").onclick=()=>{$("updlock").hidden=true};
-function updLockTick(ok){if(!ul&&ok&&st.updating>=0&&st.available)ul={target:st.available,from:st.version,t0:Date.now(),lost:false};   // page opened mid-update
- if(!ul)return;
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&ul&&ul.stage==="confirm")closeLock()});
+function updLockTick(ok){if(!ul&&ok&&st.updating>=0&&st.available)ul={target:st.available,from:st.version,stage:"run",t0:Date.now(),lost:false};   // page opened mid-update
+ if(!ul||ul.stage!=="run")return;
  if(!ok){ul.lost=true;showLock();return}
- if("v"+st.version===ul.target||(st.version!==ul.from&&st.updating<0)){$("updlock").hidden=true;ul=null;toast(`Updated to v${st.version}`);return}
+ if("v"+st.version===ul.target||(st.version!==ul.from&&st.updating<0)){closeLock(`Updated to v${st.version}`);return}
  ul.lost=false;
+ if(ul.cancelling&&st.updating<0){closeLock("Update cancelled");return}
  if(st.updating<0&&Date.now()-ul.t0>12000&&!/^Starting|^Checking/.test(st.update||"")){lockFail(st.update);return}
  showLock()}
 $("updbarGo").onclick=startUpdate;

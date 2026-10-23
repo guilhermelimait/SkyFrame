@@ -127,7 +127,7 @@ void drawMenu() {
     gRoundRect(x, y, TW, TH, 20, C_FAINT);
     icon(i, x + 34, y + TH / 2, C_FAINT);
     gText(NAMES[i], x + 66, y + 38, 18, F500, C_FG);
-    String v = i == P_LIGHT ? String(CFG.bDay) + "%" : i == P_NIGHT ? nightText()
+    String v = i == P_LIGHT ? String(nightNow() ? CFG.bNight : CFG.bDay) + "%" : i == P_NIGHT ? nightText()
              : i == P_SOUND ? String(CFG.soundWake ? "On" : "Off") : i == P_CLOCK ? String(CFG.h12 ? "12-hour" : "24-hour")
              : timeText(CFG.rotate);
     gText(v.c_str(), x + TW - 40, y + 38, 16, F400, C_SOFT, RIGHT);
@@ -166,10 +166,14 @@ void slider(float y, int v) {
 }
 
 // brightness: the daytime level
+// (the level in effect right now: during night hours that's the night level)
 void drawLight() {
-  hero(String(CFG.bDay) + "%");
-  slider(SL_Y, CFG.bDay);
-  helper(nightOn() ? "Daytime level \xC2\xB7 the night level is in Night mode" : "Changes live as you drag");
+  bool night = nightNow();
+  int v = night ? CFG.bNight : CFG.bDay;
+  hero(String(v) + "%");
+  slider(SL_Y, v);
+  if (night) helper((String("Night mode is on until ") + hourText(CFG.nTo) + " \xC2\xB7 this sets the night level").c_str());
+  else helper(nightOn() ? "Daytime level \xC2\xB7 the night level is in Night mode" : "Changes live as you drag");
 }
 
 // clock: two big option cards
@@ -233,7 +237,8 @@ void drawSound() {
     gText(lab[i], x + 64, SC_Y + 33, 17, F500, sel ? C_SUN : C_SOFT, CENTER);
   }
   gText("Sound now", 36, 314, 15, F500, C_DIM);
-  if (micRunning()) {
+  if (!CFG.soundWake) gText("Off \xC2\xB7 microphone not in use", 444, 314, 15, F400, C_DIM, RIGHT);
+  else if (micRunning()) {
     auto pos = [](float db) { return SL_X0 + (SL_X1 - SL_X0) * constrain((db + 75) / 60, 0.f, 1.f); };
     float lx = pos(micLevel()), tx = pos(micFloor() + micMargin(CFG.soundSense));
     bool hears = micHears(CFG.soundSense);
@@ -356,7 +361,7 @@ void setLight(bool night, int v) {   // a slider moved: store it and show that b
   if (dst == v) return;
   LOCK(); dst = v; UNLOCK();
   changed = true;
-  invalidate(night ? P_NIGHT : P_LIGHT); invalidate(MENU);
+  invalidate(P_NIGHT); invalidate(P_LIGHT); invalidate(MENU);
   hwBacklight(max(v, 3));
   frameDirty = true;
 }
@@ -419,7 +424,7 @@ bool quickLog = false;
 
 /* ---------------- public ---------------- */
 bool quickActive() { return mode != Q_OFF; }
-bool quickWantsMic() { return mode != Q_OFF && (page == P_SOUND || viewB == P_SOUND); }
+bool quickWantsMic() { return mode != Q_OFF && CFG.soundWake && (page == P_SOUND || viewB == P_SOUND); }   // meter only when it's on
 void quickDebug(int id) {
   if (mode == Q_OFF) openPull();
   if (mode == Q_OFF) return;
@@ -462,7 +467,7 @@ bool quickTouch(bool down, int x, int y) {
 
   if (down) {
     if (sliderDrag) {
-      setLight(page == P_NIGHT, (int)roundf((x - SL_X0) * 100.f / (SL_X1 - SL_X0)));
+      setLight(page == P_NIGHT || nightNow(), (int)roundf((x - SL_X0) * 100.f / (SL_X1 - SL_X0)));
     } else if (gesture == G_PULL) {
       oy = constrain(dy - N + 40, -N, 0);   // the panel's bottom edge follows the finger
       frameDirty = true;

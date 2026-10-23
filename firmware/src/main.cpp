@@ -129,6 +129,10 @@ static void serialDebug() {
       if (hwImu(ax, ay, az)) Serial.printf("IMU %.2f %.2f %.2f rotation %d\n", ax, ay, az, CFG.rotation); else Serial.print("IMU none\n");
     } else if (!strcmp(line, "resync")) {
       Serial.printf("RESYNC %d\n", hwResync());
+    } else if (!strcmp(line, "check")) {
+      wifiWake(5 * 60000);
+      otaPeek = true;
+      Serial.print("OK check\n");
     } else if (!strcmp(line, "update")) {
       wifiWake(10 * 60000);
       otaForce = true;

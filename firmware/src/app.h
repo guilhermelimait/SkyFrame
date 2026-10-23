@@ -4,7 +4,7 @@
 #include "astro.h"
 
 #ifndef FW_VERSION          // the update-test build overrides it (see platformio.ini)
-#define FW_VERSION "1.3.1"
+#define FW_VERSION "1.3.2"
 #endif
 #define HOSTNAME "skyframe"
 #define SETUP_AP "SkyFrame-Setup"

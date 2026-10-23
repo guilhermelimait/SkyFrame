@@ -49,7 +49,11 @@ static bool authed() {
 }
 
 static void setupRoutes() {
-  server.on("/", HTTP_GET, [] { wifiWake(5 * 60000); server.send(200, "text/html", setupMode ? SETUP_HTML : SETTINGS_HTML); });
+  server.on("/", HTTP_GET, [] {
+    wifiWake(5 * 60000);
+    server.sendHeader("Cache-Control", "no-store");   // always the page of the firmware that is running now
+    server.send(200, "text/html", setupMode ? SETUP_HTML : SETTINGS_HTML);
+  });
 
   server.on("/api/scan", HTTP_GET, [] {
     if (!authed()) return;
@@ -160,6 +164,17 @@ static void setupRoutes() {
     wifiWake(5 * 60000);
     otaForce = true;
     sendJson("{\"ok\":true}");
+  });
+
+  // cancel an update that is still checking or downloading (once flash is being written it can't be stopped)
+  server.on("/api/update/cancel", HTTP_POST, [] {
+    if (!authed()) return;
+    bool can = otaPhase <= 1;
+    if (can && otaForce) {            // asked for but not started yet
+      otaForce = false; otaPercent = -1; otaPhase = 0;
+      strlcpy(otaStatus, "Update cancelled", sizeof otaStatus);
+    } else if (can && otaPercent >= 0) otaCancel = true;   // checking or downloading: stops at the next block
+    sendJson(can ? "{\"ok\":true}" : "{\"ok\":false}");
   });
 
   // the settings page opened: look for a new version (at most every 10 minutes, GitHub limits anonymous requests)

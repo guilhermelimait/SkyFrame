@@ -9,7 +9,7 @@ fetch their data over Wi-Fi a few times an hour, and update their own firmware f
 
 ![All 16 SkyFrame screens](docs/overview.png)
 
-**Current version: 1.3.1** · [Changelog](CHANGELOG.md) · [Security](SECURITY.md) · [Hardware notes](docs/hardware.md)
+**Current version: 1.3.2** · [Changelog](CHANGELOG.md) · [Security](SECURITY.md) · [Hardware notes](docs/hardware.md)
 
 > **Project status: proof of concept / MVP**
 >
@@ -25,7 +25,7 @@ fetch their data over Wi-Fi a few times an hour, and update their own firmware f
 - **16 screens**, changing every 15 s with a smooth slide; drag them with your finger like pages on a phone
 - **Quick settings on the display**: swipe down from the top for brightness, night mode, clock format and screen time
 - **Auto-rotation**: the built-in motion sensor turns the picture to match how the display stands (or pick a fixed angle)
-- **Wake on sound**: at night the screen stays at its night level and brightens for a minute when there's sound around (loudness only, nothing recorded)
+- **Wake on sound**: at night the screen stays at its night level and brightens when there's sound around, until it's been quiet for a minute (loudness only, nothing recorded)
 - **Runs on the device**: no PC, no cloud account, no app to install
 - **Light on Wi-Fi**: connects every 15 minutes to update, then switches the radio off
 - **On-device astronomy**: planet positions, sky map, Moon phase and sky events are calculated offline on the chip
@@ -232,6 +232,7 @@ python tools/shot.py out t=now demo s=0 shot s=1 shot
 | `demo` | load sample weather, air-quality and Space Station data |
 | `s <n>` | force screen *n* (`-1` releases it) |
 | `log` | toggle event logging (touches, screen changes, draw times) |
+| `check` | look for a newer version on GitHub without installing |
 | `update` | check GitHub now and install a newer version, with the log over USB |
 | `radio 0` / `radio 1` | force Wi-Fi off / back on (to check whether a glitch comes from network activity) |
 | `mic on` / `mic off` / `mic` | start or stop the microphone, print its loudness (both channels, dBFS) |
