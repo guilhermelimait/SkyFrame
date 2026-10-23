@@ -107,8 +107,12 @@ static void setupRoutes() {
     LOCK();
     Config c = CFG;
     bool ok = cfgFromJson(server.arg("plain"), c);
+    bool needData = false;
     if (ok) {
       bool placeChanged = c.lat != CFG.lat || c.lon != CFG.lon || c.fahrenheit != CFG.fahrenheit;
+      bool clocksChanged = false;
+      for (int i = 0; i < 3; i++) clocksChanged |= c.wc[i].lat != CFG.wc[i].lat || c.wc[i].lon != CFG.wc[i].lon;
+      needData = placeChanged || clocksChanged;
       CFG = c;
       if (placeChanged) { WX.ok = false; AQ.ok = false; }
     }
@@ -116,7 +120,10 @@ static void setupRoutes() {
     UNLOCK();
     if (!ok) return sendJson("{\"error\":\"bad json\"}", 400);
     cfgSave();
-    cfgDirty = true;
+    // only a new place, units or world-clock cities need fresh data: a full refresh is ~5 HTTPS downloads, and that
+    // Wi-Fi traffic disturbs the screen, so rotation, interval, brightness or screen order just redraw
+    if (needData) cfgDirty = true;
+    cfgVersion = cfgVersion + 1;
     sendJson(s);
   });
 
@@ -144,7 +151,13 @@ static void setupRoutes() {
 
   server.on("/api/update/check", HTTP_POST, [] {
     if (!authed()) return;
-    strlcpy(otaStatus, "Checking GitHub\xE2\x80\xA6", sizeof otaStatus);
+    if (otaAvailable[0]) {   // installing a version we already know about: show the update screen right away
+      strlcpy(otaNewVersion, otaAvailable, sizeof otaNewVersion);
+      strlcpy(otaStatus, "Starting the update\xE2\x80\xA6", sizeof otaStatus);
+      otaPhase = 1;
+      otaPercent = 0;
+    } else strlcpy(otaStatus, "Checking GitHub\xE2\x80\xA6", sizeof otaStatus);
+    wifiWake(5 * 60000);
     otaForce = true;
     sendJson("{\"ok\":true}");
   });

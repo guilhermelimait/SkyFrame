@@ -9,7 +9,7 @@ fetch their data over Wi-Fi a few times an hour, and update their own firmware f
 
 ![All 16 SkyFrame screens](docs/overview.png)
 
-**Current version: 1.2** · [Changelog](CHANGELOG.md) · [Security](SECURITY.md) · [Hardware notes](docs/hardware.md)
+**Current version: 1.3** · [Changelog](CHANGELOG.md) · [Security](SECURITY.md) · [Hardware notes](docs/hardware.md)
 
 > **Project status: proof of concept / MVP**
 >
@@ -22,7 +22,10 @@ fetch their data over Wi-Fi a few times an hour, and update their own firmware f
 
 ## Features
 
-- **16 screens**, changing every 15 s (or by tap / swipe)
+- **16 screens**, changing every 15 s with a smooth slide; drag them with your finger like pages on a phone
+- **Quick settings on the display**: swipe down from the top for brightness, night mode, clock format and screen time
+- **Auto-rotation**: the built-in motion sensor turns the picture to match how the display stands (or pick a fixed angle)
+- **Wake on sound**: at night the screen stays at its night level and brightens for a minute when there's sound around (loudness only, nothing recorded)
 - **Runs on the device**: no PC, no cloud account, no app to install
 - **Light on Wi-Fi**: connects every 15 minutes to update, then switches the radio off
 - **On-device astronomy**: planet positions, sky map, Moon phase and sky events are calculated offline on the chip
@@ -94,9 +97,21 @@ Pins, panel timing and other low-level details are in [docs/hardware.md](docs/ha
 
 | Do this | To |
 |---|---|
-| Tap the right side, or swipe left | Go to the next screen |
-| Tap the left third, or swipe right | Go back |
+| Drag sideways, or tap the right side | Next screen (it follows your finger and slides in) |
+| Drag the other way, or tap the left third | Previous screen |
+| Swipe down from the top edge | **Quick settings**: brightness, night mode, clock, screen time |
 | Hold for 1 second | Turn on Wi-Fi for 10 minutes and show the settings address, a QR code and the **pairing code** |
+
+### Quick settings
+
+Swipe down from the top edge of any screen for five settings in rows. Tap one to open its page; on a page, swipe **left to right** to go
+back to the menu (or tap ‹) and **right to left** for the next option. Swipe up on the menu to close; changes are saved
+when it closes.
+
+| | | |
+|:-:|:-:|:-:|
+| ![Quick settings](docs/screenshots/quick/menu.png)<br>**Menu** | ![Brightness](docs/screenshots/quick/brightness.png)<br>**Brightness**: live while you drag | ![Night mode](docs/screenshots/quick/night.png)<br>**Night mode**: hours and night brightness |
+| ![Wake on sound](docs/screenshots/quick/sound.png)<br>**Wake on sound**: sensitivity and a live meter | ![Clock](docs/screenshots/quick/clock.png)<br>**Clock**: 24- or 12-hour | ![Screen time](docs/screenshots/quick/screen-time.png)<br>**Screen time**: how long each screen stays |
 
 Open **`http://skyframe.local`** (or the IP shown) on a phone or PC on the same Wi-Fi. Scanning the QR code pairs
 your phone automatically; otherwise type the 6-digit code once per browser.
@@ -180,7 +195,10 @@ once over USB. From then on your display follows your releases.
 skyframe/
 ├── firmware/                 PlatformIO project for the board
 │   ├── src/
-│   │   ├── main.cpp          screen loop, touch gestures, transitions, USB debug commands
+│   │   ├── main.cpp          screen loop, touch gestures, sliding transitions, USB debug commands
+│   │   ├── quick.cpp         quick-settings panel (swipe down from the top)
+│   │   ├── mic.cpp           room loudness from the microphone (wake on sound)
+│   │   ├── es7210.cpp        audio chip driver (Espressif, MIT)
 │   │   ├── screens.cpp       the 16 screens (+ setup, settings-info and update screens)
 │   │   ├── gfx.cpp           anti-aliased 2D drawing + TrueType text
 │   │   ├── hw.cpp            ST7701S panel, backlight, GT911 touch
@@ -216,6 +234,11 @@ python tools/shot.py out t=now demo s=0 shot s=1 shot
 | `log` | toggle event logging (touches, screen changes, draw times) |
 | `update` | check GitHub now and install a newer version, with the log over USB |
 | `radio 0` / `radio 1` | force Wi-Fi off / back on (to check whether a glitch comes from network activity) |
+| `mic on` / `mic off` / `mic` | start or stop the microphone, print its loudness (both channels, dBFS) |
+| `i2c` | list the chips on the sensor bus (touch, motion sensor, audio, RTC, power) |
+| `imu` | print the motion sensor's gravity reading and the current rotation |
+| `quick <n>` | open the quick-settings panel on page *n* (`-1` menu, `0`–`3` pages), e.g. for screenshots |
+| `resync` | restart the panel's picture output at the next frame (prints `RESYNC 0` when accepted) |
 | `sigtest <hex signature> <message>` | check a signature with the built-in update key |
 
 The debug channel only works over a USB cable and can't read the Wi-Fi password. It can capture whatever

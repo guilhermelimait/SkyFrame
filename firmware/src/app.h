@@ -4,7 +4,7 @@
 #include "astro.h"
 
 #ifndef FW_VERSION          // the update-test build overrides it (see platformio.ini)
-#define FW_VERSION "1.2"
+#define FW_VERSION "1.3"
 #endif
 #define HOSTNAME "skyframe"
 #define SETUP_AP "SkyFrame-Setup"
@@ -27,11 +27,14 @@ struct Config {
   bool fahrenheit, h12;
   int rotate;                  // seconds, 0 = off
   int rotation;                // picture rotation, clockwise: 0, 90, 180 or 270
+  bool autoRotate;             // follow the motion sensor (rotation is then set by the sensor, not saved)
   uint32_t screens;            // bit mask of ScreenId
   uint8_t order[N_SCREENS];    // display order of all screens (ScreenId values)
   WClock wc[3];
   char cdLabel[32], cdDate[20];   // "YYYY-MM-DDTHH:MM" local time at the city
   int bDay, bNight, nFrom, nTo;
+  bool soundWake;              // at night, brighten while there is sound around
+  int soundSense;              // 0 low, 1 medium, 2 high
   bool autoUpdate;             // install new releases automatically at night
 };
 extern Config CFG;
@@ -64,7 +67,8 @@ extern SemaphoreHandle_t dataMx;
 #define LOCK() xSemaphoreTake(dataMx, portMAX_DELAY)
 #define UNLOCK() xSemaphoreGive(dataMx)
 
-extern volatile bool wifiOk, setupMode, cfgDirty, timeOk, setupFailed;
+extern volatile bool wifiOk, setupMode, cfgDirty, timeOk, setupFailed;   // cfgDirty: settings need new data
+extern volatile uint32_t cfgVersion;   // bumped on every settings change, so the screen redraws at once
 extern std::atomic<uint32_t> dataVersion;    // bumped whenever new data arrives (screens redraw on change)
 extern volatile int64_t lastSync;        // unix time of the last successful internet update
 void wifiWake(uint32_t ms);              // keep Wi-Fi on for this long (settings page access)

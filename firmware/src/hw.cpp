@@ -130,8 +130,7 @@ void hwPresent() {
   xSemaphoreTake(vsyncSem, 0);
   esp_lcd_panel_draw_bitmap(panel, 0, 0, LCD_W, LCD_H, fb[front ^ 1]);
   front ^= 1;
-  xSemaphoreTake(vsyncSem, pdMS_TO_TICKS(40));   // let the swap happen before drawing into the old buffer
-  xSemaphoreTake(vsyncSem, pdMS_TO_TICKS(40));
+  xSemaphoreTake(vsyncSem, pdMS_TO_TICKS(40));   // the old buffer has been sent: safe to draw into it
 }
 
 /* ---------- backlight (active-low PWM) ---------- */
@@ -195,6 +194,40 @@ bool hwTouch(int &x, int &y) {
   return tDown;
 }
 
+/* ---------- QMI8658 motion sensor (accelerometer only, for orientation) ---------- */
+static uint8_t imuAddr = 0;
+static void imuWrite(uint8_t reg, uint8_t v) {
+  Wire.beginTransmission(imuAddr); Wire.write(reg); Wire.write(v); Wire.endTransmission();
+}
+static bool imuInit() {
+  for (uint8_t a : {0x6B, 0x6A}) {
+    Wire.beginTransmission(a); Wire.write(0x00);   // WHO_AM_I
+    if (Wire.endTransmission(false) != 0 || Wire.requestFrom(a, (uint8_t)1) != 1) continue;
+    if (Wire.read() != 0x05) continue;
+    imuAddr = a;
+    imuWrite(0x02, 0x60);   // CTRL1: register address auto-increment, little endian
+    imuWrite(0x03, 0x06);   // CTRL2: accelerometer +-2 g, ~117 Hz
+    imuWrite(0x08, 0x01);   // CTRL7: accelerometer on, gyroscope off
+    return true;
+  }
+  return false;
+}
+bool hwImuReady() { return imuAddr != 0; }
+bool hwImu(float &ax, float &ay, float &az) {
+  if (!imuAddr) return false;
+  Wire.beginTransmission(imuAddr); Wire.write(0x35);   // AX_L .. AZ_H
+  if (Wire.endTransmission(false) != 0 || Wire.requestFrom(imuAddr, (uint8_t)6) != 6) return false;
+  int16_t v[3];
+  for (int i = 0; i < 3; i++) { uint8_t lo = Wire.read(), hi = Wire.read(); v[i] = (int16_t)(lo | (hi << 8)); }
+  ax = v[0] / 16384.f; ay = v[1] / 16384.f; az = v[2] / 16384.f;
+  return true;
+}
+void hwI2cScan(Print &out) {
+  out.print("I2C:");
+  for (uint8_t a = 1; a < 127; a++) { Wire.beginTransmission(a); if (Wire.endTransmission() == 0) out.printf(" 0x%02X", a); }
+  out.print("\n");
+}
+
 void hwInit() {
   ledcAttach(PIN_BL, 5000, 10);
   hwBacklight(0);
@@ -211,4 +244,5 @@ void hwInit() {
     Wire.beginTransmission(a);
     if (Wire.endTransmission() == 0) { gtAddr = a; break; }
   }
+  imuInit();
 }

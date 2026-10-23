@@ -28,6 +28,11 @@ h2:first-child{margin-top:4px}
 .updbar .acts{display:flex;gap:8px;flex-wrap:wrap}
 .updbar a,.updbar button{min-height:38px;padding:0 14px;border-radius:9px;font-weight:600;font-size:14px;display:inline-flex;align-items:center;text-decoration:none;border:1px solid rgba(0,0,0,.35);background:transparent;color:#000}
 .updbar button{background:#000;color:var(--sun);border-color:#000}
+.updlock{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:16px}
+.updlock .card{width:100%;max-width:420px;padding:26px 22px;text-align:center}
+.updlock h3{margin:0 0 6px;font-size:21px;font-weight:600}.updlock .big{font-size:44px;font-weight:300;margin:10px 0 4px;color:var(--sun)}
+.updlock .bar{height:8px;border-radius:4px;background:#2a2f38;overflow:hidden;margin:14px 0 12px}.updlock .bar i{display:block;height:100%;background:var(--sun);width:0;transition:width .5s}
+.updlock .spin{width:30px;height:30px;border:3px solid #2a2f38;border-top-color:var(--sun);border-radius:50%;margin:14px auto;animation:sp 1s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}
 .updbar .bar{flex-basis:100%;height:5px;border-radius:3px;background:rgba(0,0,0,.18);overflow:hidden}.updbar .bar i{display:block;height:100%;background:#000;width:0;transition:width .4s}
 .chip{background:var(--panel2);border-radius:999px;padding:5px 11px;font-size:12.5px;color:var(--soft);display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--bad);flex:none}.dot.on{background:var(--good)}
@@ -169,12 +174,14 @@ details[open] summary .v svg{transform:rotate(90deg)}
     <h2>Display</h2>
     <div class="card">
      <div class="field"><div class="lab"><label for="rotate">Change screen every</label><span><output id="rotateOut"></output><span class="saved" data-for="rotate">Saved ✓</span></span></div><input type="range" id="rotate" min="0" max="60" step="5"></div>
-     <div class="field"><div class="lab"><span>Rotation</span><span class="saved" data-for="rotation">Saved ✓</span></div><div class="seg" id="rotation" role="group" aria-label="Rotation"><button data-v="0">0°</button><button data-v="90">90°</button><button data-v="180">180°</button><button data-v="270">270°</button></div></div>
+     <div class="field"><div class="lab"><span>Rotation</span><span class="saved" data-for="rotation">Saved ✓</span></div><div class="seg" id="rotation" role="group" aria-label="Rotation"><button data-v="auto">Auto</button><button data-v="0">0°</button><button data-v="90">90°</button><button data-v="180">180°</button><button data-v="270">270°</button></div></div><p class="note" style="margin-top:6px">Auto turns the picture with the display, using its motion sensor. Pick an angle to fix it.</p>
      <details><summary><span class="t">Night mode</span><span class="v"><span id="nightSum"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></span></summary>
       <div class="dbody">
        <div class="lab" style="margin:0"><span>From</span><span>To</span></div>
        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><select id="nFrom" aria-label="Night starts"></select><select id="nTo" aria-label="Night ends"></select></div>
        <div><div class="lab"><label for="bNight">Night brightness</label><span><output id="bNightOut"></output><span class="saved" data-for="bNight">Saved ✓</span></span></div><input type="range" id="bNight" min="0" max="100" step="5"></div>
+       <div class="row" style="min-height:44px"><span class="t"><span id="sWakeLab">Wake on sound</span><small>At night, use the day brightness for a minute when there's sound around. Only loudness is measured; nothing is recorded.</small></span><label class="sw"><input type="checkbox" id="sWake" role="switch" aria-labelledby="sWakeLab"><span></span></label></div>
+       <div class="field" id="sSenseRow"><div class="lab"><span>Sound sensitivity</span><span class="saved" data-for="soundSense">Saved ✓</span></div><div class="seg" id="sSense" role="group" aria-label="Sound sensitivity"><button data-v="0">Low</button><button data-v="1">Medium</button><button data-v="2">High</button></div></div>
        <div><div class="lab"><label for="bDay">Day brightness</label><span><output id="bDayOut"></output><span class="saved" data-for="bDay">Saved ✓</span></span></div><input type="range" id="bDay" min="5" max="100" step="5"></div>
       </div></details>
     </div>
@@ -234,6 +241,14 @@ details[open] summary .v svg{transform:rotate(90deg)}
  <div class="btns" style="margin-top:20px;justify-content:flex-end"><button class="btn" id="wskip" style="background:none">Skip</button><button class="btn" id="wdone" style="background:var(--sun);color:#000;border-color:var(--sun)">Done</button></div>
 </div></div>
 
+<div class="updlock" id="updlock" role="alertdialog" aria-modal="true" aria-labelledby="ulTitle" aria-live="polite" hidden><div class="card">
+ <h3 id="ulTitle">Updating SkyFrame</h3>
+ <div class="big" id="ulPct"></div><div class="spin" id="ulSpin" hidden></div>
+ <div class="bar" id="ulBar"><i id="ulFill"></i></div>
+ <p class="note" id="ulMsg"></p>
+ <p class="note" style="margin-top:10px">Please keep the display powered and this page open. It goes back to the previous version by itself if anything goes wrong.</p>
+ <button class="btn" id="ulClose" style="width:100%;margin-top:14px" hidden>Close</button>
+</div></div>
 <div class="modal" id="bigbox" role="dialog" aria-modal="true" aria-label="Exact picture"><div class="big"><p class="bigcap" id="bigCap">Exact picture from the display</p><canvas id="cvBig" width="480" height="480"></canvas><button class="btn" id="bigClose" style="width:100%;margin-top:12px">Close</button></div></div>
 
 <script>
@@ -688,13 +703,16 @@ function commitOrder(){const ord=[...$("list").children].map(c=>c.dataset.k);if(
 const hh=h=>String(h).padStart(2,"0")+":00";
 function renderDevice(){
  range("rotate",()=>cfg.rotate,v=>cfg.rotate=v,v=>v?`${v} s`:"Never");
- seg($("rotation"),()=>String(cfg.rotation||0),v=>cfg.rotation=+v,"rotation");
+ seg($("rotation"),()=>cfg.autoRotate!==false?"auto":String(cfg.rotation||0),v=>{if(v==="auto")cfg.autoRotate=true;else{cfg.autoRotate=false;cfg.rotation=+v}},"rotation");
  for(const id of ["nFrom","nTo"]){const el=$(id);el.innerHTML=[...Array(24).keys()].map(h=>`<option value="${h}">${hh(h)}</option>`).join("");el.value=cfg.brightness[id==="nFrom"?"nightFrom":"nightTo"];
   el.onchange=()=>change("night",c=>c.brightness[id==="nFrom"?"nightFrom":"nightTo"]=+el.value,0)}
  range("bNight",()=>cfg.brightness.night,v=>cfg.brightness.night=v,v=>v+"%");
  range("bDay",()=>cfg.brightness.day,v=>cfg.brightness.day=v,v=>v+"%");
  $("nightSum").textContent=`${hh(cfg.brightness.nightFrom)}–${hh(cfg.brightness.nightTo)} · ${cfg.brightness.night}%`;
  $("citySum").textContent=`Showing ${cityText(cfg.city)} · ${(+cfg.city.lat).toFixed(2)}, ${(+cfg.city.lon).toFixed(2)}`;
+ $("sWake").checked=!!cfg.soundWake;$("sSenseRow").hidden=!cfg.soundWake;
+ $("sWake").onchange=e=>{$("sSenseRow").hidden=!e.target.checked;change("soundWake",c=>c.soundWake=e.target.checked,0)};
+ seg($("sSense"),()=>String(cfg.soundSense??1),v=>cfg.soundSense=+v,"soundSense");
  $("auto").checked=cfg.update.auto;$("auto").onchange=e=>change("auto",c=>c.update.auto=e.target.checked,0)}
 function renderNow(){
  const night=st&&st.night,b=cfg.brightness;
@@ -714,7 +732,8 @@ function showCurrent(cur){const ord=cfg?cfg.order.filter(k=>cfg.screens.includes
  document.querySelectorAll(".scr").forEach(c=>{const b=c.querySelector(".sbody b"),has=b.querySelector(".cur-badge");if(c.dataset.k===cur&&!has)b.insertAdjacentHTML("beforeend",'<span class="cur-badge">On screen</span>');if(c.dataset.k!==cur&&has)has.remove()})}
 // after a tap: show the expected screen at once, then confirm with the display quickly
 async function follow(expect){pending=expect;if(expect){showCurrent(expect);drawLive()}for(let i=0;i<12;i++){await new Promise(r=>setTimeout(r,250));await poll();if(!pending)break}pending=null}
-async function poll(){try{st=await api("/api/status").then(r=>r.json())}catch(e){$("dot").classList.remove("on");$("online").textContent="Display not reachable";return}
+async function poll(){try{st=await api("/api/status").then(r=>r.json())}catch(e){$("dot").classList.remove("on");$("online").textContent="Display not reachable";updLockTick(false);return}
+ updLockTick(true);
  $("dot").classList.add("on");$("online").textContent="Online";
  $("upd1").hidden=st.lastSyncAgo<0;$("upd1").textContent=`Updated ${ago(st.lastSyncAgo)}`;
  $("upd2").hidden=st.nextSyncIn<0;$("upd2").textContent=st.nextSyncIn>60?`Next in ${Math.round(st.nextSyncIn/60)} min`:"Updating soon";
@@ -762,8 +781,26 @@ function showVersion(){const v="v"+st.version,u=st.update||"",inst=st.updating>=
  if(inst){const ph=st.phase|0;$("updbarFill").style.width=(ph>=2?100:st.updating)+"%";
   $("updbarText").innerHTML=ph>=3?`<b>Installed ${esc(av)}.</b> The display is restarting…`:ph==2?`<b>Installing ${esc(av)}.</b> The screen turns off for a few seconds, then restarts.`:`<b>Downloading ${esc(av)}</b> · ${st.updating}%. Keep the display powered.`}
  else $("updbarText").innerHTML=`<b>SkyFrame ${esc(av)} is available.</b> This display has ${esc(v)}.`}
-$("updbarGo").onclick=async()=>{try{await post("/api/update/check");$("updbarActs").hidden=true;$("updbarText").innerHTML=`<b>Starting the update…</b>`;setTimeout(poll,1500)}catch(e){}};
-$("check").onclick=async()=>{const inst=st&&st.available;try{await post("/api/update/check");$("updState").textContent=inst?"Installing… the display restarts when it's done":"Checking GitHub…";setTimeout(poll,5000)}catch(e){}};
+// full-screen lock while an update runs: from Install until the display is back on the new version
+let ul=null;   // {target, from, t0, lost}
+function startUpdate(){const target=st&&st.available;if(!target)return;ul={target,from:st.version,t0:Date.now(),lost:false};showLock();
+ post("/api/update/check").catch(()=>{});setTimeout(poll,800)}
+function showLock(){const L=$("updlock");L.hidden=false;$("ulTitle").textContent=`Updating to ${ul.target}`;$("ulClose").hidden=true;
+ const ph=st&&st.phase|0,pct=st&&st.updating>=0?st.updating:0,indet=ul.lost||ph>=2;
+ $("ulPct").hidden=indet;$("ulSpin").hidden=!indet;$("ulBar").hidden=indet;$("ulPct").textContent=pct+"%";$("ulFill").style.width=pct+"%";
+ $("ulMsg").textContent=ul.lost?"The display is restarting on the new version… reconnecting":ph>=3?"Installed. Restarting…":ph==2?"Installing. The display's screen turns off for a few seconds.":pct>0?"Downloading the new version":"Starting the update…"}
+function lockFail(msg){$("ulTitle").textContent="The update didn't finish";$("ulPct").hidden=true;$("ulSpin").hidden=true;$("ulBar").hidden=true;
+ $("ulMsg").textContent=!msg||/^Version|^Up to date/.test(msg)?"The display didn't start the update. Please try again.":msg;$("ulClose").hidden=false;ul=null}
+$("ulClose").onclick=()=>{$("updlock").hidden=true};
+function updLockTick(ok){if(!ul&&ok&&st.updating>=0&&st.available)ul={target:st.available,from:st.version,t0:Date.now(),lost:false};   // page opened mid-update
+ if(!ul)return;
+ if(!ok){ul.lost=true;showLock();return}
+ if("v"+st.version===ul.target||(st.version!==ul.from&&st.updating<0)){$("updlock").hidden=true;ul=null;toast(`Updated to v${st.version}`);return}
+ ul.lost=false;
+ if(st.updating<0&&Date.now()-ul.t0>12000&&!/^Starting|^Checking/.test(st.update||"")){lockFail(st.update);return}
+ showLock()}
+$("updbarGo").onclick=startUpdate;
+$("check").onclick=async()=>{if(st&&st.available)return startUpdate();try{await post("/api/update/check");$("updState").textContent="Checking GitHub…";setTimeout(poll,5000)}catch(e){}};
 $("forget").onclick=async()=>{if(!confirm("Forget this Wi-Fi network and restart in setup mode? You'll set up Wi-Fi again from the display."))return;try{await post("/api/wifi/forget");toast("Restarting in setup mode…")}catch(e){}};
 $("newpin").onclick=async()=>{if(!confirm("Make a new pairing code? Other phones and computers will need to enter it."))return;try{const r=await post("/api/pin/new").then(r=>r.json());PIN=r.pin;try{localStorage.setItem("pin",PIN)}catch(e){}toast("New pairing code: "+r.pin)}catch(e){}};
 citySearch($("city"),$("cityResults"),r=>change("city",c=>{c.city=placeOf(r);c.off=tzOffset(r.timezone)},0));
@@ -795,7 +832,7 @@ async function start(){if(running)return;try{await api("/api/auth")}catch(e){ret
  cfg=await api("/api/config").then(r=>r.json());await poll();renderAll();
  let t;try{t=localStorage.getItem("tab")}catch(e){}showTab(t||"now");
  await loadData();loadLand();welcome();post("/api/update/peek").then(()=>setTimeout(poll,6000)).catch(()=>{});if(document.fonts)Promise.all([300,400,500].map(w=>document.fonts.load(`${w} 16px Inter`))).then(drawLive,()=>{});
- setInterval(()=>{if(!document.hidden&&!pending)poll()},2000);setInterval(drawLive,1000);setInterval(()=>{if(Date.now()-dataAt>60000)loadData()},10000);
+ setInterval(()=>{if(!document.hidden&&!pending)poll()},2000);setInterval(()=>{if(ul)poll()},1000);setInterval(drawLive,1000);setInterval(()=>{if(Date.now()-dataAt>60000)loadData()},10000);
  document.addEventListener("visibilitychange",()=>{if(!document.hidden){poll();loadData()}})}
 start();
 </script></body></html>

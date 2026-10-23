@@ -14,6 +14,10 @@ This page explains what it protects, how, and where the limits are. It's provide
 
 Nothing else is stored, and the device doesn't collect or send any usage data.
 
+**Microphone:** only used for *Wake on sound*, only at night with that setting on (or while its quick-settings
+page shows the meter). Each 32 ms of sound is turned into one loudness number and discarded on the spot: nothing is
+recorded, stored or sent.
+
 ## What leaves your home
 
 - Your chosen city's **coordinates** go to [Open-Meteo](https://open-meteo.com/) for weather and air quality, and the

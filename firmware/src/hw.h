@@ -16,3 +16,6 @@ void hwFlashEnd();
 int hwResync();         // restart the panel's scan-out at the next frame (0 = accepted)
 bool hwTouch(int &x, int &y);   // true while a finger is down
 bool hwHasTouch();
+bool hwImuReady();                         // QMI8658 motion sensor found
+bool hwImu(float &ax, float &ay, float &az);   // acceleration in g (gravity when still)
+void hwI2cScan(Print &out);                // USB debug: list the chips on the sensor bus

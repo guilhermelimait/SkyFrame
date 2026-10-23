@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.3 (2026-10-23)
+
+### On the display
+- **Quick settings:** swipe down from the top edge of any screen. Four tiles (brightness, night mode, clock, screen
+  time) open pages that slide in; swipe left to right to go back, right to left for the next option, up to close.
+  Brightness changes live as you drag; night mode has its hours and its own brightness together. Settings are saved
+  once, when the panel closes (flash writes disturb the screen).
+- **Screens slide:** drag a screen sideways and it follows your finger, with the next or previous screen coming in;
+  taps slide quickly, and the automatic change slides gently instead of blinking to black. The neighbouring screens
+  are drawn ahead of time, so only finished pictures move (no waiting, no glitches).
+- Smoother animation: each frame waits for one screen refresh instead of two.
+- **Quick settings in five rows** (icon, name, value): brightness, night mode, wake on sound, clock, screen time.
+- **Wake on sound:** at night, the screen stays at its night level and uses the day brightness for a minute when
+  there's sound around. It learns the room's background noise and reacts to sound above it (sensitivity low, medium,
+  high; a live meter on its page). The microphone only runs while it's needed; only loudness is measured, nothing is
+  recorded or sent.
+- **Auto-rotation:** the board's motion sensor turns the picture to match how the display stands (after it's been
+  steady for a moment; not while it lies flat or is touched). New default *Auto* in Settings → Rotation; picking a
+  fixed angle turns it off.
+
+### Fixes and settings page
+- **Fix: glitches after changing the rotation (or interval, brightness, screen order).** Every settings change
+  started a full data refresh (about five HTTPS downloads), and that Wi-Fi traffic disturbed the screen. Only a
+  new place, units or world-clock cities refresh data now; other changes just redraw, and right away.
+- **Install now starts at once.** The display goes straight to the update (no data refresh first) and shows its
+  update screen immediately.
+- **The settings page locks while updating:** a full-screen overlay from *Install now* until the display is back
+  on the new version, with download progress, the install step and the restart; it closes with "Updated to …",
+  or shows the reason if the update didn't finish. Opening the page during an update shows it too.
+
 ## 1.2 (2026-10-21)
 
 ### Display

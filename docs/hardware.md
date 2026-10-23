@@ -69,10 +69,42 @@ almost nothing.
 - That's why the firmware redraws only when content changes, uses a backlight dip instead of blended transitions,
   and avoids flash writes on every Wi-Fi connection.
 - Network traffic counts too: this framework keeps Wi-Fi buffers in PSRAM. The firmware therefore keeps blocks up
-  to 32 KB (TLS, JSON) in internal RAM (`heap_caps_malloc_extmem_enable`), and the settings page's live preview is a
-  half-size image refreshed every 20 s, only while the page is visible.
+  to 32 KB (TLS, JSON) in internal RAM (`heap_caps_malloc_extmem_enable`). The settings page draws its live view
+  itself from the display's data, so it doesn't copy pictures from the display.
+- Flash access also pauses PSRAM: settings are saved only when they change (with the backlight briefly off), status
+  requests never read flash, and updates are downloaded into PSRAM and written to flash in one go.
+- Moving to a neighbouring screen, and the quick-settings panel, slide pictures that were drawn in advance (row
+  copies), so nothing is re-rendered during an animation.
 
 ## Flash layout
 
 `default_16MB.csv`: two 6.5 MB app slots (for over-the-air updates with rollback), NVS for settings, and a
 data partition. Firmware is about 2.5 MB.
+
+## Sensor bus (I2C on GPIO 47 / 48)
+
+Found on this board with the USB command `i2c`:
+
+| Address | Chip | Used for |
+|---|---|---|
+| 0x14 / 0x5D | GT911 | touch |
+| 0x18 | ES8311 | audio output (not used yet; needs a speaker on the MX1.25 connector) |
+| 0x20 | TCA9554 | IO expander (panel setup lines, speaker amplifier enable on pin 3) |
+| 0x34 | AXP2101 | power and battery management (not used yet) |
+| 0x40 | ES7210 | microphone input (wake on sound) |
+| 0x51 | PCF85063 | battery-backed clock (not used yet) |
+| 0x6B | QMI8658 | motion sensor (auto-rotation) |
+
+**Motion sensor orientation** (gravity in the sensor's frame): +Y = upright (0°), −X = 90°, −Y = 180° (USB-C on the
+left), +X = 270°.
+
+## Audio (I2S)
+
+ES7210 microphone input: MCLK GPIO 5, BCLK 16, LRCK 7, data in 15 (from Waveshare's board definition). The firmware
+reads 16 kHz, 16-bit stereo and turns each 32 ms block into one loudness value.
+
+## USB ports
+
+- **USB** (the chip's own USB): flashing, the USB debug channel. Shows as "USB Serial Device" on Windows.
+- **UART** (CH343 USB-serial chip): always able to flash the board, whatever the firmware does. To recover a board
+  that doesn't answer on the other port: hold **BOOT** while plugging in, then flash.

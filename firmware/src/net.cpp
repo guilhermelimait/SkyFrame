@@ -23,6 +23,7 @@ SkyEvent EVENTS[6];
 int nEvents = 0;
 SemaphoreHandle_t dataMx;
 volatile bool wifiOk = false, setupMode = false, cfgDirty = true, timeOk = false, setupFailed = false;
+volatile uint32_t cfgVersion = 0;
 volatile int curScreen = S_CONNECTING;
 volatile int navRequest = 0;
 volatile int showRequest = -1;
@@ -40,6 +41,8 @@ void cfgDefaults(Config &c) {
   strcpy(c.city, "London"); strcpy(c.country, "United Kingdom"); strcpy(c.cc, "GB");
   c.lat = 51.5085; c.lon = -0.1257; c.off = 3600;
   c.rotate = 15;
+  c.autoRotate = true;
+  c.soundSense = 1;
   c.screens = (1u << N_SCREENS) - 1;
   for (int i = 0; i < N_SCREENS; i++) c.order[i] = i;
   c.wc[0] = {"New York", 40.7143, -74.006, -4 * 3600};
@@ -59,6 +62,9 @@ String cfgToJson(const Config &c) {
   d["h12"] = c.h12;
   d["rotate"] = c.rotate;
   d["rotation"] = c.rotation;
+  d["autoRotate"] = c.autoRotate;
+  d["soundWake"] = c.soundWake;
+  d["soundSense"] = c.soundSense;
   JsonArray s = d["screens"].to<JsonArray>();
   JsonArray o = d["order"].to<JsonArray>();
   for (int i = 0; i < N_SCREENS; i++) {
@@ -92,6 +98,9 @@ bool cfgFromJson(const String &str, Config &c) {
   c.rotate = constrain((int)(d["rotate"] | c.rotate), 0, 600);
   int rot = d["rotation"] | c.rotation;
   if (rot == 0 || rot == 90 || rot == 180 || rot == 270) c.rotation = rot;
+  c.autoRotate = d["autoRotate"] | c.autoRotate;
+  c.soundWake = d["soundWake"] | c.soundWake;
+  c.soundSense = constrain((int)(d["soundSense"] | c.soundSense), 0, 2);
   if (d["screens"].is<JsonArray>()) {
     uint32_t m = 0;
     for (JsonVariant v : d["screens"].as<JsonArray>()) {
@@ -358,10 +367,10 @@ static void netTask(void *) {
 
     if (radioOff) { if (wifiOk || WiFi.getMode() != WIFI_OFF) { disconnectWifi(); wifiOk = false; } delay(200); continue; }
     if (!setupMode) {
-      bool due = !synced || dirty || otaForce || ms - lastSyncMs > SYNC_MINUTES * 60000u;
+      bool due = !synced || dirty || ms - lastSyncMs > SYNC_MINUTES * 60000u;
       nextSyncAt = lastSyncMs + SYNC_MINUTES * 60000u;
       bool awake = (int32_t)(awakeUntil - ms) > 0;
-      if (due || awake) wifiOk = connectWifi(ssid, pass, 20000);
+      if (due || awake || otaForce) wifiOk = connectWifi(ssid, pass, 20000);
       else wifiOk = false;
       if (wifiOk && due) {
         for (int i = 0; i < 50 && time(nullptr) < 1700000000; i++) delay(200);   // wait for NTP
@@ -393,6 +402,7 @@ static void netTask(void *) {
           lastOta = ms;
           if (otaCheckAndInstall(OTA_REPO)) { delay(1500); ESP.restart(); }
           otaPercent = -1;
+          otaPhase = 0;
           dataVersion++;
         } else if (otaPeek) {
           otaPeek = false;
