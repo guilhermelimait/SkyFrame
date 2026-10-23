@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.1 (2026-10-23)
+
+- **Fix: opening *Screen time* in quick settings restarted the display.** The fifth page had no picture memory
+  (the list still had four pages); every page now gets its own, however many there are.
+
 ## 1.3 (2026-10-23)
 
 ### On the display

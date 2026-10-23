@@ -316,14 +316,19 @@ void slideTo(int from, int to, int dir) {   // animated slide between two pictur
   startAnim(false, 0, 1);
 }
 bool allocate() {
-  for (uint16_t **p : {&base, &menuBuf, &pageBuf[0], &pageBuf[1], &pageBuf[2], &pageBuf[3]})
-    if (!*p) *p = (uint16_t *)ps_malloc(N * N * 2);
-  for (uint16_t *p : {base, menuBuf, pageBuf[0], pageBuf[1], pageBuf[2], pageBuf[3]}) if (!p) return false;
+  // every picture the panel uses: the old screen, the menu and one per page (all of them, whatever PAGES is)
+  if (!base) base = (uint16_t *)ps_malloc(N * N * 2);
+  if (!menuBuf) menuBuf = (uint16_t *)ps_malloc(N * N * 2);
+  for (auto &p : pageBuf) if (!p) p = (uint16_t *)ps_malloc(N * N * 2);
+  if (!base || !menuBuf) return false;
+  for (auto *p : pageBuf) if (!p) return false;
   invalidateAll();
   return true;
 }
 void release() {
-  for (uint16_t **p : {&base, &menuBuf, &pageBuf[0], &pageBuf[1], &pageBuf[2], &pageBuf[3]}) { free(*p); *p = nullptr; }
+  free(base); base = nullptr;
+  free(menuBuf); menuBuf = nullptr;
+  for (auto &p : pageBuf) { free(p); p = nullptr; }
 }
 void openPull() {   // a finger started pulling the panel down from the top edge
   if (!allocate()) { release(); return; }
