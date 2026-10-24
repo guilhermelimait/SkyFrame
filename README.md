@@ -9,7 +9,7 @@ fetch their data over Wi-Fi a few times an hour, and update their own firmware f
 
 ![All 16 SkyFrame screens](docs/overview.png)
 
-**Current version: 1.3.2** · [Changelog](CHANGELOG.md) · [Security](SECURITY.md) · [Hardware notes](docs/hardware.md)
+**Current version: 1.3.3** · [Changelog](CHANGELOG.md) · [Security](SECURITY.md) · [Hardware notes](docs/hardware.md)
 
 > **Project status: proof of concept / MVP**
 >

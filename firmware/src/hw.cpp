@@ -134,23 +134,43 @@ void hwPresent() {
 }
 
 /* ---------- backlight (active-low PWM) ---------- */
-static int blLevel = 0;
-static std::atomic<int> flashDepth{0};
+// The screen loop, the network task (flash writes, updates) and the web task all change the backlight, so every
+// change goes through one lock: a "dark during a flash write" can never be undone by a brightness change racing it.
+static SemaphoreHandle_t blMx = nullptr;
+static int blLevel = 0, flashDepth = 0;
+static bool stayDark = false;
+static void blApply() { ledcWrite(PIN_BL, (flashDepth || stayDark) ? 1023 : 1023 - (1023 * blLevel) / 100); }
 void hwBacklight(int pct) {
+  xSemaphoreTake(blMx, portMAX_DELAY);
   blLevel = constrain(pct, 0, 100);
-  if (!flashDepth) ledcWrite(PIN_BL, 1023 - (1023 * blLevel) / 100);
+  blApply();
+  xSemaphoreGive(blMx);
 }
 
 /* ---------- flash writes ---------- */
 int hwResync() { return panel ? (int)esp_lcd_rgb_panel_restart(panel) : -1; }
 void hwFlashBegin() {
-  if (flashDepth++ == 0) ledcWrite(PIN_BL, 1023);   // dark while the picture may be out of step
+  xSemaphoreTake(blMx, portMAX_DELAY);
+  flashDepth++;
+  blApply();                                         // dark while the picture may be out of step
+  xSemaphoreGive(blMx);
 }
 void hwFlashEnd() {
-  if (--flashDepth > 0) return;
+  xSemaphoreTake(blMx, portMAX_DELAY);
+  bool last = --flashDepth == 0;
+  xSemaphoreGive(blMx);
+  if (!last) return;
   hwResync();
   delay(60);                                         // a couple of clean frames before the light comes back
-  if (!flashDepth) ledcWrite(PIN_BL, 1023 - (1023 * blLevel) / 100);
+  xSemaphoreTake(blMx, portMAX_DELAY);
+  blApply();
+  xSemaphoreGive(blMx);
+}
+void hwStayDark() {                                  // until the restart (after installing an update)
+  xSemaphoreTake(blMx, portMAX_DELAY);
+  stayDark = true;
+  blApply();
+  xSemaphoreGive(blMx);
 }
 
 /* ---------- GT911 ---------- */
@@ -229,6 +249,7 @@ void hwI2cScan(Print &out) {
 }
 
 void hwInit() {
+  blMx = xSemaphoreCreateMutex();
   ledcAttach(PIN_BL, 5000, 10);
   hwBacklight(0);
   Wire.begin(PIN_SDA, PIN_SCL, 400000);

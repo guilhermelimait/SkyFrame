@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.3.3 (2026-10-24)
+
+- **Fix: flickering at the end of an update and an off-centre "Restarting" message.** The backlight could be switched
+  back on by the screen loop while the new firmware was being written (flash writes scramble the picture). Every
+  backlight change now goes through one lock, and after a successful install the screen stays dark until the restart,
+  so the next thing on screen is the new version starting.
+- **Fix: with Auto-rotation on, saving a setting from the settings page flipped the screen** for a moment (the page
+  sent back an old rotation). The sensor's rotation is kept.
+- **Fix: the screen could go black for up to a second after closing quick settings.** Brightness is restored at once.
+- Auto-rotation pauses during updates; the display keeps working (without slide effects) if picture memory can't be
+  allocated.
+
 ## 1.3.2 (2026-10-23)
 
 - **Updates ask first and can be cancelled.** *Install now* opens a box covering the page ("Install v1.3.2?") with

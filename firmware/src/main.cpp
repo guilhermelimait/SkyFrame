@@ -206,6 +206,7 @@ static float dragF = 0;
 const uint16_t *previewFrame() { return (quickActive() || dragging || !pic[0]) ? (CFG.rotation ? upright : hwFront()) : pic[0]; }
 
 static void renderPic(int slot, int s) {
+  if (!pic[slot]) return;   // no memory for it: slides stay off (picId stays -1), screens are drawn directly
   int idx, count;
   dotInfo(s, idx, count);
   gTarget(pic[slot]);
@@ -272,8 +273,16 @@ static void present(int s) {
   bool change = shown >= 0 && shown != s;
   uint32_t t0 = millis();
   if (change) backlightRamp(blLevel, 0);                    // a jump that isn't a neighbour: dip to black…
-  renderPic(0, s);
-  showBuf(pic[0]);
+  if (pic[0]) { renderPic(0, s); showBuf(pic[0]); }
+  else {   // (picture memory couldn't be allocated: draw straight into the panel's buffer)
+    int idx, count, rot = CFG.rotation;
+    dotInfo(s, idx, count);
+    gTarget(rot ? upright : hwBack());
+    drawScreen(s, idx, count);
+    if (rot) rotateInto(upright, hwBack(), rot);
+    hwPresent();
+    frameNo++;
+  }
   hwResync();   // heavy drawing (rotation especially) can leave the panel out of step: restart it cleanly
   if (change) { delay(20); backlightRamp(0, blLevel); }     // …and back up on the new screen
   shown = s;
@@ -303,7 +312,7 @@ static int sensedRotation() {
 static void autoRotate(bool touching) {
   static uint32_t lastRead = 0, since = 0;
   static int candidate = -1;
-  if (!CFG.autoRotate || !hwImuReady() || touching || dragging || quickActive() || millis() - lastRead < 200) return;
+  if (!CFG.autoRotate || !hwImuReady() || !upright || touching || dragging || quickActive() || otaPercent >= 0 || millis() - lastRead < 200) return;
   lastRead = millis();
   int r = sensedRotation();
   if (r < 0 || r == CFG.rotation) { candidate = -1; return; }
@@ -444,7 +453,7 @@ void loop() {
     }
     if (quickActive()) { delay(2); return; }
   }
-  if (quickJustClosed()) { forceRedraw = true; blLevel = -1; lastNav = millis(); }
+  if (quickJustClosed()) { forceRedraw = true; blLevel = -1; updateBacklight(); lastNav = millis(); }   // right away, not on the next tick
 
   // ---- draw only when needed ----
   uint32_t key = redrawKey(current);

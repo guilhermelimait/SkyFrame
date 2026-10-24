@@ -117,6 +117,7 @@ static void setupRoutes() {
       bool clocksChanged = false;
       for (int i = 0; i < 3; i++) clocksChanged |= c.wc[i].lat != CFG.wc[i].lat || c.wc[i].lon != CFG.wc[i].lon;
       needData = placeChanged || clocksChanged;
+      if (c.autoRotate) c.rotation = CFG.rotation;   // the sensor decides: a page save mustn't flip the picture back
       CFG = c;
       if (placeChanged) { WX.ok = false; AQ.ok = false; }
     }

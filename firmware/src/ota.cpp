@@ -204,6 +204,9 @@ bool otaCheckAndInstall(const char *repo, bool install) {
   if (!ok) Update.abort();
   free(img);
   otaPhase = ok ? 3 : 0;
+  // installed: stay dark until the restart, so the next thing on screen is the new version starting
+  // (lighting a "restarting" frame right after the flash write showed a shifted, flickering picture)
+  if (ok) hwStayDark();
   hwFlashEnd();
   if (!ok) { otaPercent = -1; setStatus("Couldn't finish installing"); return false; }
   setStatus("Installed %s, restarting", tag.c_str());
